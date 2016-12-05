@@ -38,8 +38,17 @@ from ..stim.monitor import stim_monitor
 from ..utils.utils import scrape_cycle
 from .db_tables import load_connection, open_settings
 from .db_tables import Base
-from .db_tables import Files, Headers
-from .db_tables import Lampflash, Stims, Darks, sptkeys, Data, Gain, Acqs
+from .db_tables import Files, Lampflash, Stims, Darks, Gain
+
+#-------------------------------------------------------------------------------
+
+
+
+
+# BEGIN PARSRING FUNCTIONS
+
+
+
 
 #-------------------------------------------------------------------------------
 
@@ -138,7 +147,20 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
                 else:
                     continue
 
+                #-- This will check for the instance of rootname that may exist in the table
+                #-- Since we ingest FUVA first, then FUVB, we want to eliminate any repeating
+                #-- data instances.
+                if table.__tablename__ == 'fuv_primary_headers':
+                    q = session.query(table.id).filter(table.rootname==row['rootname'])
+                    if not session.query(q.exists()).scalar():
+                        session.add(table(**row))
+                    else:
+                        pass
+                else:
+                    session.add(table(**row))
+
             session.add(table(**row))
+
     except (IOError, ValueError) as e:
         #-- Handle missing files
         logger.warning("Exception hit for {}, adding blank entry".format(filename))
@@ -150,6 +172,17 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
     engine.dispose()
 
 #-------------------------------------------------------------------------------
+
+
+
+
+# BEGIN INSERTION QUERIES
+
+
+
+
+#-------------------------------------------------------------------------------
+
 
 def insert_files(**kwargs):
     """Populate the main table of all files in the base directory
@@ -203,59 +236,6 @@ def insert_files(**kwargs):
     session.close()
 
 #-------------------------------------------------------------------------------
-
-def populate_lampflash(num_cpu=1):
-    """ Populate the lampflash table
-
-    """
-    logger.info("adding to lampflash table")
-
-    settings = open_settings()
-    Session, engine = load_connection(settings['connection_string'])
-    session = Session()
-
-    files_to_add = [(result.id, os.path.join(result.path, result.name))
-                        for result in session.query(Files).\
-                                filter(or_(Files.name.like('%lampflash%'), (Files.name.like('%_rawacq%')))).\
-                                outerjoin(Lampflash, Files.id == Lampflash.file_id).\
-                                filter(Lampflash.file_id == None)]
-    session.close()
-    engine.dispose()
-
-    args = [(full_filename, Lampflash, pull_flashes, f_key) for f_key, full_filename in files_to_add]
-
-    logger.info("Found {} files to add".format(len(args)))
-    pool = mp.Pool(processes=num_cpu)
-    pool.map(mp_insert, args)
-
-#-------------------------------------------------------------------------------
-
-def populate_stims(num_cpu=1):
-    """ Populate the stim table
-
-    """
-    logger.info("adding to stim table")
-
-    settings = open_settings()
-    Session, engine = load_connection(settings['connection_string'])
-    session = Session()
-
-    files_to_add = [(result.id, os.path.join(result.path, result.name))
-                        for result in session.query(Files).\
-                                filter(Files.name.like('%corrtag\_%')).\
-                                outerjoin(Stims, Files.id == Stims.file_id).\
-                                filter(Stims.file_id == None)]
-    session.close()
-
-
-    args = [(full_filename, Stims, locate_stims, f_key) for f_key, full_filename in files_to_add]
-
-    logger.info("Found {} files to add".format(len(args)))
-    pool = mp.Pool(processes=num_cpu)
-    pool.map(mp_insert, args)
-
-#-------------------------------------------------------------------------------
-
 def populate_darks(num_cpu=1):
     """ Populate the darks table
 
@@ -284,7 +264,6 @@ def populate_darks(num_cpu=1):
     pool.map(mp_insert, args)
 
 #-------------------------------------------------------------------------------
-
 def populate_gain(num_cpu=1):
     """ Populate the cci gain table
 
@@ -316,316 +295,96 @@ def populate_gain(num_cpu=1):
     logger.info("Found {} files to add".format(len(functions)))
     pool = mp.Pool(processes=num_cpu)
     pool.map(call, functions)
-
 #-------------------------------------------------------------------------------
-
-def populate_spt(num_cpu=1):
-    """ Populate the table of primary header information
+def populate_lampflash(num_cpu=1):
+    """ Populate the lampflash table
 
     """
-    logger.info("adding spt header table")
+    logger.info("adding to lampflash table")
+
     settings = open_settings()
     Session, engine = load_connection(settings['connection_string'])
-
     session = Session()
 
     files_to_add = [(result.id, os.path.join(result.path, result.name))
                         for result in session.query(Files).\
-                                filter(Files.name.like('%\_spt.fits%')).\
-                                outerjoin(sptkeys, Files.id == sptkeys.file_id).\
-                                filter(sptkeys.file_id == None)]
+                                filter(or_(Files.name.like('%lampflash%'), (Files.name.like('%_rawacq%')))).\
+                                outerjoin(Lampflash, Files.id == Lampflash.file_id).\
+                                filter(Lampflash.file_id == None)]
     session.close()
-    args = [(full_filename, sptkeys, get_spt_keys, f_key) for f_key, full_filename in files_to_add]
+    engine.dispose()
+
+    args = [(full_filename, Lampflash, pull_flashes, f_key) for f_key, full_filename in files_to_add]
 
     logger.info("Found {} files to add".format(len(args)))
     pool = mp.Pool(processes=num_cpu)
     pool.map(mp_insert, args)
 
 #-------------------------------------------------------------------------------
+def populate_stims(num_cpu=1):
+    """ Populate the stim table
 
-def populate_data(num_cpu=1):
+    """
+    logger.info("adding to stim table")
+
+    settings = open_settings()
+    Session, engine = load_connection(settings['connection_string'])
+    session = Session()
+
+    files_to_add = [(result.id, os.path.join(result.path, result.name))
+                        for result in session.query(Files).\
+                                filter(Files.name.like('%corrtag\_%')).\
+                                outerjoin(Stims, Files.id == Stims.file_id).\
+                                filter(Stims.file_id == None)]
+    session.close()
+
+
+    args = [(full_filename, Stims, locate_stims, f_key) for f_key, full_filename in files_to_add]
+
+    logger.info("Found {} files to add".format(len(args)))
+    pool = mp.Pool(processes=num_cpu)
+    pool.map(mp_insert, args)
+
+#-------------------------------------------------------------------------------
+def populate_table(num_cpu=1, tablename, query_string, function):
     logger.info("adding to data table")
 
     settings = open_settings()
     Session, engine = load_connection(settings['connection_string'])
     session = Session()
 
+
     files_to_add = [(result.id, os.path.join(result.path, result.name))
                         for result in session.query(Files).\
-                                filter(Files.name.like('%_x1d.fits%')).\
-                                outerjoin(Data, Files.id == Data.file_id).\
-                                filter(Data.file_id == None)]
+                                filter(Files.name.like(query_string)).\
+                                outerjoin(table, Files.id == table.file_id).\
+                                filter(table.file_id == None)]
     session.close()
-    args = [(full_filename, Data, update_data, f_key) for f_key, full_filename in files_to_add]
+    args = [(full_filename, table, function, f_key) for f_key, full_filename in files_to_add]
 
     logger.info("Found {} files to add".format(len(args)))
     pool = mp.Pool(processes=num_cpu)
     pool.map(mp_insert, args)
+#-------------------------------------------------------------------------------
+
+
+
+
+# BEGIN KEYWORD LISTS FOR DB.
+
+
+
+
 
 #-------------------------------------------------------------------------------
 
-def populate_primary_headers(num_cpu=1):
-    """ Populate the table of primary header information
 
-    """
-    logger.info("adding to primary header table")
 
-    t = """
-        CREATE TEMPORARY TABLE which_file (rootname CHAR(9), has_x1d BOOLEAN,has_corr BOOLEAN, has_raw BOOLEAN, has_acq BOOLEAN);
-        CREATE INDEX info ON which_file (rootname, has_x1d, has_corr, has_raw, has_acq);
-        INSERT INTO which_file (rootname, has_x1d, has_corr, has_raw, has_acq)
-          SELECT rootname,
-               IF(SUM(name LIKE '%_x1d%'), true, false) as has_x1d,
-               IF(SUM(name LIKE '%_corrtag%'), true, false) as has_corr,
-               IF(SUM(name LIKE '%_rawtag%'), true, false) as has_raw,
-               IF(SUM(name LIKE '%_rawacq%'), true, false) as has_acq
-                   FROM files
-                   WHERE rootname NOT IN (SELECT headers.rootname from headers)
-                   GROUP BY rootname;
-        """
 
-    q = """
-        SELECT
-         CASE
-            WHEN which_file.has_x1d = 1 THEN (SELECT CONCAT(files.path, '/', files.name) FROM files WHERE files.rootname = which_file.rootname AND
-                                                                                    files.name LIKE CONCAT(which_file.rootname, '_x1d.fits%') LIMIT 1)
-            WHEN which_file.has_corr = 1 THEN (SELECT CONCAT(files.path, '/', files.name) FROM files WHERE files.rootname = which_file.rootname AND
-                                                                                    files.name LIKE CONCAT(which_file.rootname, '_corrtag%') LIMIT 1)
-            WHEN which_file.has_raw = 1 THEN (SELECT CONCAT(files.path, '/', files.name) FROM files WHERE files.rootname = which_file.rootname AND
-                                                                                    files.name LIKE CONCAT(which_file.rootname, '_rawtag%') LIMIT 1)
-            WHEN which_file.has_acq = 1 THEN (SELECT CONCAT(files.path, '/', files.name) FROM files WHERE files.rootname = which_file.rootname AND
-                                                                                    files.name LIKE CONCAT(which_file.rootname, '_rawacq%') LIMIT 1)
-            ELSE NULL
-        END as file_to_grab,
-         CASE
-            WHEN which_file.has_x1d = 1 THEN (SELECT files.id FROM files WHERE files.rootname = which_file.rootname AND
-                                                                                    files.name LIKE CONCAT(which_file.rootname, '_x1d.fits%') LIMIT 1)
-            WHEN which_file.has_corr = 1 THEN (SELECT files.id FROM files WHERE files.rootname = which_file.rootname AND
-                                                                                    files.name LIKE CONCAT(which_file.rootname, '_corrtag%') LIMIT 1)
-            WHEN which_file.has_raw = 1 THEN (SELECT files.id FROM files WHERE files.rootname = which_file.rootname AND
-                                                                                    files.name LIKE CONCAT(which_file.rootname, '_rawtag%') LIMIT 1)
-            WHEN which_file.has_acq = 1 THEN (SELECT files.id FROM files WHERE files.rootname = which_file.rootname AND
-                                                                                    files.name LIKE CONCAT(which_file.rootname, '_rawacq%') LIMIT 1)
-            ELSE NULL
-        END as file_id
+# BEGIN DB WRAPPERS
 
-        FROM which_file
-            WHERE (has_x1d = 1 OR has_corr = 1 OR has_raw = 1 OR has_acq);
-    """
 
-    settings = open_settings()
-    Session, engine = load_connection(settings['connection_string'])
 
-    engine.execute(text(t))
-
-    files_to_add = [(result.file_id, result.file_to_grab) for result in engine.execute(text(q))
-                        if not result.file_id == None]
-
-    #args = [(full_filename, Headers, get_primary_keys, f_key) for f_key, full_filename in files_to_add]
-
-    functions = [functools.partial(insert_with_yield,
-                                   filename=filename,
-                                   table=Headers,
-                                   function=get_primary_keys,
-                                   foreign_key=f_key) for f_key, filename in files_to_add]
-
-    logger.info("Found {} files to add".format(len(functions)))
-    pool = mp.Pool(processes=num_cpu)
-    pool.map(call, functions)
-
-#-------------------------------------------------------------------------------
-
-def populate_acqs(num_cpu=1):
-    logger.info("adding to data table")
-
-    settings = open_settings()
-    Session, engine = load_connection(settings['connection_string'])
-    session = Session()
-
-    files_to_add = [(result.id, os.path.join(result.path, result.name))
-                        for result in session.query(Files).\
-                                filter(Files.name.like('%_rawacq.fits%')).\
-                                outerjoin(Acqs, Files.id == Acqs.file_id).\
-                                filter(Acqs.file_id == None)]
-    session.close()
-    args = [(full_filename, Acqs, get_acq_keys, f_key) for f_key, full_filename in files_to_add]
-
-    logger.info("Found {} files to add".format(len(args)))
-    pool = mp.Pool(processes=num_cpu)
-    pool.map(mp_insert, args)
-
-#-------------------------------------------------------------------------------
-
-def get_spt_keys(filename):
-    """ Read the necessary keywords from SPT files
-
-    Parameters
-    ----------
-    filename : str
-        name of the file to read
-
-    Returns
-    -------
-    keywords : dict
-        dictionary of keyword,value pairs
-    """
-
-    with fits.open(filename) as hdu:
-        keywords = {'rootname':hdu[0].header.get('rootname', None),
-                    'proc_typ':hdu[0].header.get('proc_typ', None),
-                    'prop_typ':hdu[0].header.get('prop_typ', None),
-                    'lomfstp':hdu[2].header.get('lomfstp', None),
-                    'lapxlvdt':hdu[2].header.get('lapxlvdt', None),
-                    'lapdlvdt':hdu[2].header.get('lapdlvdt', None),
-                    'lom1posc':hdu[2].header.get('lom1posc', None),
-                    'lom2posc':hdu[2].header.get('lom2posc', None),
-                    'lom1posf':hdu[2].header.get('lom1posf', None),
-                    'lom2posf':hdu[2].header.get('lom2posf', None),
-                    'ldcampat':hdu[2].header.get('ldcampat', None),
-                    'ldcampbt':hdu[2].header.get('ldcampbt', None),
-                    'lmmcetmp':hdu[2].header.get('lmmcetmp', None),
-                    'dominant_gs':hdu[0].header.get('dgestar', None),
-                    'secondary_gs':hdu[0].header.get('sgestar', None),
-                    'start_time':hdu[0].header.get('PSTRTIME', None),
-                    'search_dimensions':hdu[1].header.get('lqtascan', None),
-                    'search_step_size':hdu[1].header.get('lqtastep', None),
-                    'search_type':hdu[1].header.get('lqtacent', None),
-                    'search_floor':hdu[1].header.get('lqtaflor', None),
-                    'lqtadpos':hdu[1].header.get('lqtadpos', None),
-                    'lqtaxpos':hdu[1].header.get('lqtaxpos', None),
-                    'lqitime':hdu[1].header.get('lqitime', None)
-                    }
-
-    return keywords
-
-#-------------------------------------------------------------------------------
-
-def get_primary_keys(filename):
-    with fits.open(filename) as hdu:
-        keywords = {  'filetype':hdu[0].header['filetype'],
-                          'instrume':hdu[0].header['instrume'],
-                          'rootname':hdu[0].header['rootname'],
-                          'imagetyp':hdu[0].header['imagetyp'],
-                          'targname':hdu[0].header['targname'],
-                          'ra_targ':hdu[0].header['ra_targ'],
-                          'dec_targ':hdu[0].header['dec_targ'],
-                          'proposid':hdu[0].header['proposid'],
-                          'qualcom1':hdu[0].header.get('qualcom1', ''),
-                          'qualcom2':hdu[0].header.get('qualcom2', ''),
-                          'qualcom3':hdu[0].header.get('qualcom3', ''),
-                          'quality':hdu[0].header.get('quality', ''),
-                          'postarg1':hdu[0].header['postarg1'],
-                          'postarg2':hdu[0].header['postarg2'],
-                          'cal_ver':hdu[0].header['cal_ver'],
-                          'proctime':hdu[0].header['proctime'],
-
-                          'opus_ver':hdu[0].header['opus_ver'],
-                          'obstype':hdu[0].header['obstype'],
-                          'obsmode':hdu[0].header['obsmode'],
-                          'exptype':hdu[0].header['exptype'],
-                          'detector':hdu[0].header['detector'],
-                          'segment':hdu[0].header['segment'],
-                          'detecthv':hdu[0].header['detecthv'],
-                          'life_adj':hdu[0].header['life_adj'],
-                          'fppos':hdu[0].header['fppos'],
-                          'exp_num':hdu[0].header['exp_num'],
-                          'cenwave':hdu[0].header['cenwave'],
-                          'propaper':hdu[0].header['propaper'],
-                          'apmpos':hdu[0].header.get('apmpos', None),
-                          'aperxpos':hdu[0].header.get('aperxpos', None),
-                          'aperypos':hdu[0].header.get('aperypos', None),
-                          'aperture':hdu[0].header['aperture'],
-                          'opt_elem':hdu[0].header['opt_elem'],
-                          'shutter':hdu[0].header['shutter'],
-                          'extended':hdu[0].header['extended'],
-                          'obset_id':hdu[0].header.get('obset_id', None),
-                          'asn_id':hdu[0].header.get('asn_id', None),
-                          'asn_tab':hdu[0].header.get('asn_tab', None),
-                          'randseed':hdu[0].header.get('randseed', None),
-                          'asn_mtyp':hdu[1].header.get('asn_mtyp', None),
-                          'overflow':hdu[1].header.get('overflow', None),
-                          'nevents':hdu[1].header.get('nevents', None),
-                          'neventsa':hdu[1].header.get('neventsa', None),
-                          'neventsb':hdu[1].header.get('neventsb', None),
-                          'dethvla':hdu[1].header.get('dethvla', None),
-                          'dethvlb':hdu[1].header.get('dethvlb', None),
-                          'deventa':hdu[1].header.get('deventa', None),
-                          'deventb':hdu[1].header.get('deventb', None),
-                          'feventa':hdu[1].header.get('feventa', None),
-                          'feventb':hdu[1].header.get('feventb', None),
-                          'hvlevela':hdu[1].header.get('hvlevela', None),
-                          'hvlevelb':hdu[1].header.get('hvlevelb', None),
-                          'date_obs':hdu[1].header['date-obs'],
-                          'dpixel1a':hdu[1].header.get('dpixel1a', None),
-                          'dpixel1b':hdu[1].header.get('dpixel1b', None),
-                          'time_obs':hdu[1].header['time-obs'],
-                          'expstart':hdu[1].header['expstart'],
-                          'expend':hdu[1].header['expend'],
-                          'exptime':hdu[1].header['exptime'],
-                          'numflash':hdu[1].header.get('numflash', None),
-                          'ra_aper':hdu[1].header['ra_aper'],
-                          'dec_aper':hdu[1].header['dec_aper'],
-                          'shift1a':hdu[1].header.get('shift1a', None),
-                          'shift1b':hdu[1].header.get('shift1b', None),
-                          'shift1c':hdu[1].header.get('shift1c', None),
-                          'shift2a':hdu[1].header.get('shift2a', None),
-                          'shift2b':hdu[1].header.get('shift2b', None),
-                          'shift2c':hdu[1].header.get('shift2c', None),
-
-                          'sp_loc_a':hdu[1].header.get('sp_loc_a', None),
-                          'sp_loc_b':hdu[1].header.get('sp_loc_b', None),
-                          'sp_loc_c':hdu[1].header.get('sp_loc_c', None),
-                          'sp_nom_a':hdu[1].header.get('sp_nom_a', None),
-                          'sp_nom_b':hdu[1].header.get('sp_nom_b', None),
-                          'sp_nom_c':hdu[1].header.get('sp_nom_c', None),
-                          'sp_off_a':hdu[1].header.get('sp_off_a', None),
-                          'sp_off_b':hdu[1].header.get('sp_off_b', None),
-                          'sp_off_c':hdu[1].header.get('sp_off_c', None),
-                          'sp_err_a':hdu[1].header.get('sp_err_a', None),
-                          'sp_err_b':hdu[1].header.get('sp_err_b', None),
-                          'sp_err_c':hdu[1].header.get('sp_err_c', None),
-
-                          'dethvl':hdu[1].header.get('dethvl', None),
-                          'cycle':scrape_cycle(hdu[0].header.get('asn_id', None))
-                                                                        }
-    return keywords
-
-#-------------------------------------------------------------------------------
-def update_data(args):
-    """Update DB data table in parallel"""
-
-    #args is the filename!!! (might want to design this like other functions)
-    try:
-        with fits.open(args) as hdu:
-            if len(hdu[1].data):
-                data ={'flux_mean':hdu[1].data['flux'].ravel().mean(),
-                       'flux_max':hdu[1].data['flux'].ravel().max(),
-                       'flux_std':hdu[1].data['flux'].ravel().std(),
-                       'wl_min':hdu[1].data['wavelength'].ravel().min(),
-                       'wl_max':hdu[1].data['wavelength'].ravel().max()
-                                                                              }
-            else:
-                data = {'flux_mean':None,
-                        'flux_max':None,
-                        'flux_std':None,
-                        'wl_min':None,
-                        'wl_max':None
-                                        }
-            return data
-    except IOError:
-        print('IOERROR')
-
-#-------------------------------------------------------------------------------
-
-def get_acq_keys(filename):
-    with fits.open(filename) as hdu:
-        keywords = {'rootname':hdu[0].header['rootname'],
-                    'obset_id': hdu[1].header.get('obset_id', None),
-                    'linenum':hdu[0].header['linenum'],
-                    'exptype':hdu[0].header['exptype'],
-                    'target':hdu[0].header.get('targname', None),
-                    }
-    return keywords
 
 #-------------------------------------------------------------------------------
 
@@ -762,14 +521,43 @@ def ingest_all():
 
     logger.info("Ingesting all data")
     insert_files(**settings)
-    populate_primary_headers(settings['num_cpu'])
-    populate_spt(settings['num_cpu'])
-    populate_data(settings['num_cpu'])
+
+    #-------------------------------------------------------
+    #-- Populate FUV data
+    #-- Populate FUV shared primary header info
+    populate_table(settings['num_cpu'], fuv_primary_headers, '%_rawtag_a.fits%', fuva_raw_keys)
+    populate_table(settings['num_cpu'], fuv_primary_headers, '%_rawtag_b.fits%', fuvb_raw_keys)
+
+    #-- Populate FUV Raw data
+    populate_table(settings['num_cpu'], fuva_raw, '%_rawtag_a.fits%', fuva_raw_keys)
+    populate_table(settings['num_cpu'], fuva_raw, '%_rawtag_b.fits%', fuvb_raw_keys)
+
+    #-- Populate FUV Corrtags
+    populate_table(settings['num_cpu'], fuva_corr, '%_corrtag_a.fits%', fuva_corr_keys)
+    populate_table(settings['num_cpu'], fuvb_corr, '%_corrtag_b.fits%', fuvb_corr_keys)
+
+    #-- Populate FUV x1d
+    populate_table(settings['num_cpu'], fuv_x1d, '%_x1d.fits%', fuva_corr_keys)
+
+    #-------------------------------------------------------
+    #-- Populate NUV data
+    #-- Populate NUV Raw data
+    populate_table(settings['num_cpu'], nuv_raw, '%_rawtag.fits%', nuv_raw_keys)
+
+    #-- Populate NUV Corrtags
+    populate_table(settings['num_cpu'], nuv_corr, '%_corrtag.fits%', nuv_corr_keys)
+
+    #-- Populate NUV x1d
+    populate_table(settings['num_cpu'], nuv_x1d, '%_x1d.fits%', fuva_corr_keys)
+
+    #-------------------------------------------------------
+    #-- Populate monitor tables
+    #populate_spt(settings['num_cpu'])
     populate_lampflash(settings['num_cpu'])
     populate_darks(settings['num_cpu'])
     populate_gain(settings['num_cpu'])
     populate_stims(settings['num_cpu'])
-    populate_acqs(settings['num_cpu'])
+    #populate_acqs(settings['num_cpu'])
 
 #-------------------------------------------------------------------------------
 
@@ -828,5 +616,11 @@ def clean_slate(settings=None, engine=None, session=None):
     ingest_all()
 
     run_all_monitors()
+
+#-------------------------------------------------------------------------------
+
+
+#-- NEW KEYWORD DICTIONARIES
+
 
 #-------------------------------------------------------------------------------

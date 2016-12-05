@@ -98,7 +98,7 @@ class Darks(Base):
 #-------------------------------------------------------------------------------
 
 class Files(Base):
-    __tablename__ = 'files'
+    __tablename__ = 'all_files'
 
     id = Column(Integer, primary_key=True)
 
@@ -135,122 +135,6 @@ class Lampflash(Base):
     file_id = Column(Integer, ForeignKey('files.id'))
     __table_args__ = (Index('idx_rootname', 'rootname', unique=False), )
     #file = relationship("Files", backref=backref('lampflash', order_by=id))
-
-#-------------------------------------------------------------------------------
-
-class Headers(Base):
-    __tablename__ = "headers"
-
-    id = Column(Integer, primary_key=True)
-    filetype = Column(String(67))
-    instrume = Column(String(3))
-    rootname = Column(String(9))
-    imagetyp = Column(String(20))
-    targname = Column(String(67))
-    ra_targ = Column(Float(20))
-    dec_targ = Column(Float(20))
-    proposid = Column(Integer)
-    qualcom1 = Column(String(67))
-    qualcom2 = Column(String(67))
-    qualcom3 = Column(String(67))
-    quality = Column(String(67))
-    opus_ver = Column(String(30))
-    postarg1 = Column(Float(32))
-    postarg2 = Column(Float)
-    cal_ver = Column(String(30))
-    proctime = Column(Float)
-
-    obstype = Column(String(20))
-    obsmode = Column(String(20))
-    exptype = Column(String(20))
-    detector = Column(String(20))
-    segment = Column(String(20))
-    detecthv = Column(String(20))
-    life_adj = Column(Integer)
-    fppos = Column(Integer)
-    exp_num = Column(Integer)
-    cenwave = Column(Integer)
-    propaper = Column(String(20))
-    apmpos = Column(String(20))
-    aperxpos = Column(Float)
-    aperypos = Column(Float)
-    aperture = Column(String(8))
-    opt_elem = Column(String(7))
-    shutter = Column(String(20))
-    extended = Column(String(20))
-    obset_id = Column(String(2))
-    asn_id = Column(String(9))
-    asn_tab = Column(String(18))
-    randseed = Column(BigInteger)
-    asn_mtyp = Column(String(20))
-    overflow = Column(Integer)
-    nevents = Column(Integer)
-    neventsa = Column(Float)
-    neventsb = Column(Float)
-    dethvla = Column(Integer)
-    dethvlb = Column(Integer)
-    deventa = Column(Float)
-    deventb = Column(Float)
-    feventa = Column(Float)
-    feventb = Column(Float)
-    hvlevela = Column(Integer)
-    hvlevelb = Column(Integer)
-    dpixel1a = Column(Float)
-    dpixel1b = Column(Float)
-    date_obs = Column(String(10))
-    time_obs = Column(String(8))
-    expstart = Column(Float)
-    expend = Column(Float)
-    exptime = Column(Float)
-    numflash = Column(Integer)
-    ra_aper = Column(Float)
-    dec_aper = Column(Float)
-    shift1a = Column(Float)
-    shift2a = Column(Float)
-    shift1b = Column(Float)
-    shift2b = Column(Float)
-    shift1c = Column(Float)
-    shift2c = Column(Float)
-
-    sp_loc_a = Column(Float)
-    sp_loc_b = Column(Float)
-    sp_loc_c = Column(Float)
-    sp_nom_a = Column(Float)
-    sp_nom_b = Column(Float)
-    sp_nom_c = Column(Float)
-    sp_off_a = Column(Float)
-    sp_off_b = Column(Float)
-    sp_off_c = Column(Float)
-    sp_err_a = Column(Float)
-    sp_err_b = Column(Float)
-    sp_err_c = Column(Float)
-
-    #NUV keywords
-    dethvl = Column(Float)
-    cycle = Column(Integer)
-
-    file_id = Column(Integer, ForeignKey('files.id'))
-    #file = relationship("Files", backref=backref('headers', order_by=id))
-
-    __table_args__ = (Index('idx_rootname', 'rootname', unique=False), )
-    __table_args__ = (Index('idx_config', 'segment', 'fppos', 'cenwave', 'opt_elem', unique=False), )
-
-#-------------------------------------------------------------------------------
-
-class Data(Base):
-    __tablename__ = "data"
-
-    id = Column(Integer, primary_key=True)
-
-    flux_mean = Column(Float)
-    flux_max = Column(Float)
-    flux_std = Column(Float)
-    wl_min = Column(Float)
-    wl_max = Column(Float)
-
-
-    file_id = Column(Integer, ForeignKey('files.id'))
-    #file = relationship("Files", backref=backref('Data', order_by=id))
 
 #-------------------------------------------------------------------------------
 
@@ -336,57 +220,6 @@ class Gain(Base):
     file_id = Column(Integer, ForeignKey('files.id'))
     __table_args__ = (Index('coord', 'x', 'y', unique=False), )
     #file = relationship("Files", backref=backref('Gain', order_by=id))
-
-#-------------------------------------------------------------------------------
-
-class sptkeys(Base):
-    __tablename__ = 'spt'
-
-    id = Column(Integer, primary_key=True)
-
-    rootname = Column(String(9))
-    proc_typ = Column(String(20)) # primary extentio
-    prop_typ = Column(String(10))
-    lomfstp = Column(Float) #2 ext, focus in spreadsheet
-    lapxlvdt = Column(Integer) #2 ext, aper_disp in spreadsheet
-    lapdlvdt = Column(Integer) #2 ext, aper_xdisp in spreadsheet
-    lom1posc = Column(Integer) #2 ext, osm1_coarse in spreadsheet
-    lom2posc = Column(Integer) #2 ext, osm2_coarse in spreadsheet
-    lom1posf = Column(Integer) #2 ext, osm1_fine in spreadsheet
-    lom2posf = Column(Integer) #2 ext, osm2_fine in spreadsheet
-    ldcampat = Column(Float)
-    ldcampbt = Column(Float)
-    lmmcetmp = Column(Float)
-    dominant_gs = Column(String(20))
-    secondary_gs = Column(String(20))
-    start_time = Column(String(20))
-    search_dimensions = Column(Integer)
-    search_step_size = Column(Float)
-    search_type = Column(String(20))
-    search_floor = Column(Integer)
-    lqtadpos = Column(Float)
-    lqtaxpos = Column(Float)
-    lqitime = Column(Integer)
-
-    file_id = Column(Integer, ForeignKey('files.id'))
-
-    __table_args__ = (Index('idx_rootname', 'rootname', unique=False), )
-
-#-------------------------------------------------------------------------------
-
-class Acqs(Base):
-    __tablename__ = "acqs"
-
-    id = Column(Integer, primary_key=True)
-
-    rootname = Column(String(9))
-    obset_id = Column(String(7))
-    linenum = Column(String(10))
-    exptype = Column(String(12))
-    target = Column(String(50))
-
-    file_id = Column(Integer, ForeignKey('files.id'))
-
 #-------------------------------------------------------------------------------
 
 class Flagged(Base):
@@ -418,5 +251,9 @@ class GainTrends(Base):
     intercept = Column(Float)
 
     __table_args__ = (Index('coord', 'x', 'y', unique=False), )
+
+#-------------------------------------------------------------------------------
+
+#-- NEW TABLES.
 
 #-------------------------------------------------------------------------------
