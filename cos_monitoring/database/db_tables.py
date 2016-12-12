@@ -75,6 +75,19 @@ def load_connection(connection_string, echo=False):
 
 #-------------------------------------------------------------------------------
 
+class Files(Base):
+    __tablename__ = 'all_files'
+
+    id = Column(Integer, primary_key=True)
+
+    path = Column(String(70))
+    filename = Column(String(40))
+    rootname = Column(String(9))
+
+    __table_args__ = (Index('idx_fullpath', 'path', 'filename', unique=True), )
+    __table_args__ = (Index('idx_rootname', 'rootname'), )
+#-------------------------------------------------------------------------------
+
 class Darks(Base):
     __tablename__ = "darks"
 
@@ -92,22 +105,8 @@ class Darks(Base):
     sun_lon = Column(Float)
     temp = Column(Float)
 
-    file_id = Column(Integer, ForeignKey('files.id'))
+    file_id = Column(Integer, ForeignKey(Files.id))
     #file = relationship("Files", backref=backref('lampflash', order_by=id))
-
-#-------------------------------------------------------------------------------
-
-class Files(Base):
-    __tablename__ = 'all_files'
-
-    id = Column(Integer, primary_key=True)
-
-    path = Column(String(70))
-    name = Column(String(40))
-    rootname = Column(String(9))
-
-    __table_args__ = (Index('idx_fullpath', 'path', 'name', unique=True), )
-    __table_args__ = (Index('idx_rootname', 'rootname'), )
 
 #-------------------------------------------------------------------------------
 
@@ -132,7 +131,7 @@ class Lampflash(Base):
     cal_date = Column(String(30))
     found = Column(Boolean)
 
-    file_id = Column(Integer, ForeignKey('files.id'))
+    file_id = Column(Integer, ForeignKey(Files.id))
     __table_args__ = (Index('idx_rootname', 'rootname', unique=False), )
     #file = relationship("Files", backref=backref('lampflash', order_by=id))
 
@@ -153,7 +152,7 @@ class Stims(Base):
     stim2_y = Column(Float)
     counts = Column(Float)
     segment = Column(String(4))
-    file_id = Column(Integer, ForeignKey('files.id'))
+    file_id = Column(Integer, ForeignKey(Files.id))
 
     __table_args__ = (Index('idx_rootname', 'rootname', unique=False), )
     #file = relationship("Files", backref=backref('Stims', order_by=id))
@@ -198,7 +197,7 @@ class Phd(Base):
     pha_30 = Column(Integer)
     pha_31 = Column(Integer)
 
-    file_id = Column(Integer, ForeignKey('files.id'))
+    file_id = Column(Integer, ForeignKey(Files.id))
     #file = relationship("Files", backref=backref('Phd', order_by=id))
 
 #-------------------------------------------------------------------------------
@@ -217,7 +216,7 @@ class Gain(Base):
     dethv = Column(Integer)
     expstart = Column(Float)
 
-    file_id = Column(Integer, ForeignKey('files.id'))
+    file_id = Column(Integer, ForeignKey(Files.id))
     __table_args__ = (Index('coord', 'x', 'y', unique=False), )
     #file = relationship("Files", backref=backref('Gain', order_by=id))
 #-------------------------------------------------------------------------------
@@ -256,4 +255,39 @@ class GainTrends(Base):
 
 #-- NEW TABLES.
 
+#-------------------------------------------------------------------------------
+
+class fuv_primary_headers(Base):
+    'Table of shared keywords for both segments'
+
+    __tablename__ = 'fuv_primary_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(70))
+    rootname = Column(String(9))
+    date_obs = Column(String(10))
+    imagetyp = Column(String(10))
+    targname = Column(String(50))
+    proposid = Column(Integer)
+    ra_targ = Column(Float)
+    dec_targ = Column(Float)
+    obstype = Column(String(30))
+    obsmode = Column(String(30))
+    exptype = Column(String(30))
+    postarg1 = Column(Integer)
+    postarg2 = Column(Integer)
+    life_adj = Column(Integer)
+    fppos = Column(Integer)
+    exp_num = Column(Integer)
+    cenwave = Column(Integer)
+    propaper = Column(String(10))
+    apmpos = Column(String(10))
+    aperxpos = Column(Float)
+    aperypos = Column(Float)
+    aperture = Column(String(15))
+    opt_elem = Column(String(15))
+    extended = Column(String(5))
+
+    file_id = Column(Integer, ForeignKey(Files.id))
 #-------------------------------------------------------------------------------

@@ -38,7 +38,7 @@ from ..stim.monitor import stim_monitor
 from ..utils.utils import scrape_cycle
 from .db_tables import load_connection, open_settings
 from .db_tables import Base
-from .db_tables import Files, Lampflash, Stims, Darks, Gain
+from .db_tables import Files, Lampflash, Stims, Darks, Gain, fuv_primary_headers
 
 #-------------------------------------------------------------------------------
 
@@ -182,8 +182,6 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
 
 
 #-------------------------------------------------------------------------------
-
-
 def insert_files(**kwargs):
     """Populate the main table of all files in the base directory
 
@@ -197,17 +195,17 @@ def insert_files(**kwargs):
 
     """
 
-    logger.info("Inserting files into db")
-
     settings = open_settings()
     Session, engine = load_connection(settings['connection_string'])
 
+    logger.info("Inserting files into {}".format(settings['database']))
     data_location = kwargs.get('data_location', './')
     logger.info("Looking for new files in {}".format(data_location))
 
     session = Session()
     logger.debug("querying previously found files")
-    previous_files = {os.path.join(path, fname) for path, fname in session.query(Files.path, Files.name)}
+
+    previous_files = {os.path.join(path, fname) for path, fname in session.query(Files.path, Files.filename)}
 
     for i, (path, filename) in enumerate(find_all_datasets(data_location, settings['num_cpu'])):
         full_filepath = os.path.join(path, filename)
@@ -220,11 +218,12 @@ def insert_files(**kwargs):
         #-- properly formatted HST data should be the first 9 characters
         #-- if this is not the case, insert NULL for this value
         rootname = filename.split('_')[0]
+
         if not len(rootname) == 9:
-            rootname = None
+            rootname = 'N/A'
 
         session.add(Files(path=path,
-                          name=filename,
+                          filename=filename,
                           rootname=rootname))
 
         #-- Commit every 20 files to not lose too much progress if
@@ -346,21 +345,21 @@ def populate_stims(num_cpu=1):
     pool.map(mp_insert, args)
 
 #-------------------------------------------------------------------------------
-def populate_table(num_cpu=1, tablename, query_string, function):
-    logger.info("adding to data table")
+def populate_table(tablename, query_string, function, num_cpu=1):
+    logger.info("adding to {} table".format(tablename.__tablename__))
 
     settings = open_settings()
     Session, engine = load_connection(settings['connection_string'])
     session = Session()
 
 
-    files_to_add = [(result.id, os.path.join(result.path, result.name))
+    files_to_add = [(result.id, os.path.join(result.path, result.filename))
                         for result in session.query(Files).\
-                                filter(Files.name.like(query_string)).\
-                                outerjoin(table, Files.id == table.file_id).\
-                                filter(table.file_id == None)]
+                                filter(Files.filename.like(query_string)).\
+                                outerjoin(tablename, Files.id == tablename.file_id).\
+                                filter(tablename.file_id == None)]
     session.close()
-    args = [(full_filename, table, function, f_key) for f_key, full_filename in files_to_add]
+    args = [(full_filename, tablename, function, f_key) for f_key, full_filename in files_to_add]
 
     logger.info("Found {} files to add".format(len(args)))
     pool = mp.Pool(processes=num_cpu)
@@ -512,55 +511,6 @@ def clear_all_databases(settings, nuke=False):
 
 #-------------------------------------------------------------------------------
 
-def ingest_all():
-    setup_logging()
-
-    settings = open_settings()
-    Session, engine = load_connection(settings['connection_string'])
-    Base.metadata.create_all(engine)
-
-    logger.info("Ingesting all data")
-    insert_files(**settings)
-
-    #-------------------------------------------------------
-    #-- Populate FUV data
-    #-- Populate FUV shared primary header info
-    populate_table(settings['num_cpu'], fuv_primary_headers, '%_rawtag_a.fits%', fuva_raw_keys)
-    populate_table(settings['num_cpu'], fuv_primary_headers, '%_rawtag_b.fits%', fuvb_raw_keys)
-
-    #-- Populate FUV Raw data
-    populate_table(settings['num_cpu'], fuva_raw, '%_rawtag_a.fits%', fuva_raw_keys)
-    populate_table(settings['num_cpu'], fuva_raw, '%_rawtag_b.fits%', fuvb_raw_keys)
-
-    #-- Populate FUV Corrtags
-    populate_table(settings['num_cpu'], fuva_corr, '%_corrtag_a.fits%', fuva_corr_keys)
-    populate_table(settings['num_cpu'], fuvb_corr, '%_corrtag_b.fits%', fuvb_corr_keys)
-
-    #-- Populate FUV x1d
-    populate_table(settings['num_cpu'], fuv_x1d, '%_x1d.fits%', fuva_corr_keys)
-
-    #-------------------------------------------------------
-    #-- Populate NUV data
-    #-- Populate NUV Raw data
-    populate_table(settings['num_cpu'], nuv_raw, '%_rawtag.fits%', nuv_raw_keys)
-
-    #-- Populate NUV Corrtags
-    populate_table(settings['num_cpu'], nuv_corr, '%_corrtag.fits%', nuv_corr_keys)
-
-    #-- Populate NUV x1d
-    populate_table(settings['num_cpu'], nuv_x1d, '%_x1d.fits%', fuva_corr_keys)
-
-    #-------------------------------------------------------
-    #-- Populate monitor tables
-    #populate_spt(settings['num_cpu'])
-    populate_lampflash(settings['num_cpu'])
-    populate_darks(settings['num_cpu'])
-    populate_gain(settings['num_cpu'])
-    populate_stims(settings['num_cpu'])
-    #populate_acqs(settings['num_cpu'])
-
-#-------------------------------------------------------------------------------
-
 def run_all_monitors():
     setup_logging()
 
@@ -616,11 +566,92 @@ def clean_slate(settings=None, engine=None, session=None):
     ingest_all()
 
     run_all_monitors()
+#-------------------------------------------------------------------------------
 
+def ingest_all():
+    setup_logging()
+
+    settings = open_settings()
+    Session, engine = load_connection(settings['connection_string'])
+    Base.metadata.create_all(engine)
+
+    logger.info("Ingesting all data")
+
+
+    #-- Ingest all files into DB.
+    insert_files(**settings)
+
+    #-------------------------------------------------------
+    #-- Populate FUV data
+
+    #-- Populate FUV shared primary header info
+    populate_table(fuv_primary_headers, '%_rawtag_a.fits%', fuv_primary_keys, settings['num_cpu'] )
+    #-- Does this in 2 steps, checks to make sure that if A shares B rootname then skip.
+    populate_table(fuv_primary_headers, '%_rawtag_b.fits%', fuv_primary_keys, settings['num_cpu'] )
+
+    #-- Populate FUV Raw data
+    #populate_table(fuva_raw, '%_rawtag_a.fits%', fuva_raw_keys, settings['num_cpu'] )
+    #populate_table(fuva_raw, '%_rawtag_b.fits%', fuvb_raw_keys, settings['num_cpu'] )
+
+    #-- Populate FUV Corrtags
+    #populate_table(fuva_corr, '%_corrtag_a.fits%', fuva_corr_keys, settings['num_cpu'] )
+    #populate_table(fuvb_corr, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'] )
+
+    #-- Populate FUV x1d
+    #populate_table(fuv_x1d, '%_x1d.fits%', fuva_corr_keys, settings['num_cpu'] )
+
+    #-------------------------------------------------------
+    #-- Populate NUV data
+    #-- Populate NUV Raw data
+    #populate_table(nuv_raw, '%_rawtag.fits%', nuv_raw_keys, settings['num_cpu'] )
+
+    #-- Populate NUV Corrtags
+    #populate_table(nuv_corr, '%_corrtag.fits%', nuv_corr_keys, settings['num_cpu'] )
+
+    #-- Populate NUV x1d
+    #populate_table(nuv_x1d, '%_x1d.fits%', fuva_corr_keys, settings['num_cpu'] )
+
+    #-------------------------------------------------------
+    #-- Populate monitor tables
+    #populate_spt(settings['num_cpu'])
+    #populate_lampflash(settings['num_cpu'])
+    #populate_darks(settings['num_cpu'])
+    #populate_gain(settings['num_cpu'])
+    #populate_stims(settings['num_cpu'])
+    #populate_acqs(settings['num_cpu'])
 #-------------------------------------------------------------------------------
 
 
 #-- NEW KEYWORD DICTIONARIES
 
 
+#-------------------------------------------------------------------------------
+def fuv_primary_keys(filename):
+    with fits.open(filename) as hdu:
+            keywords = {'filename': hdu[0].header['filename'],
+                        'rootname': hdu[0].header['rootname'],
+                        'date_obs': hdu[1].header['date-obs'],
+                        'imagetyp': hdu[0].header['imagetyp'],
+                        'targname': hdu[0].header['targname'],
+                        'proposid': hdu[0].header['proposid'],
+                        'ra_targ': hdu[0].header['ra_targ'],
+                        'dec_targ': hdu[0].header['dec_targ'],
+                        'obstype': hdu[0].header['obstype'],
+                        'obsmode': hdu[0].header['obsmode'],
+                        'exptype': hdu[0].header['exptype'],
+                        'postarg1': hdu[0].header['postarg1'],
+                        'postarg2': hdu[0].header['postarg2'],
+                        'life_adj': hdu[0].header['life_adj'],
+                        'fppos': hdu[0].header['fppos'],
+                        'exp_num': hdu[0].header['exp_num'],
+                        'cenwave': hdu[0].header['cenwave'],
+                        'propaper': hdu[0].header['propaper'],
+                        'apmpos': hdu[0].header.get('apmpos', 'N/A'),
+                        'aperxpos': hdu[0].header.get('aperxpos', -999.9),
+                        'aperypos': hdu[0].header.get('aperypos', -999.9),
+                        'aperture': hdu[0].header['aperture'],
+                        'opt_elem': hdu[0].header['opt_elem'],
+                        'extended': hdu[0].header['extended'],
+                        }
+    return keywords
 #-------------------------------------------------------------------------------
