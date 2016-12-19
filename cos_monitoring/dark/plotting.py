@@ -52,6 +52,11 @@ def plot_histogram(dark, outname):
 
     """
     remove_if_there(outname)
+
+    plt.rc('font', weight='bold')
+    plt.rc('xtick.major', size=5, pad=7)
+    plt.rc('xtick', labelsize=10)
+
     fig = plt.figure(figsize=(12, 9))
 
     bin_size = 1e-7
@@ -75,9 +80,9 @@ def plot_histogram(dark, outname):
     dist_99 = ax.axvline(x=bins[count_99], lw=2, ls='-', color='DarkGreen')
 
     ax.grid(True, which='both')
-    ax.set_title('Histogram of Dark Rates')
-    ax.set_ylabel('Frequency')
-    ax.set_xlabel('Counts/pix/sec')
+    ax.set_title('Histogram of Dark Rates', fontsize= 25, fontweight='bold')
+    ax.set_ylabel('Frequency', fontsize= 20, fontweight='bold')
+    ax.set_xlabel('Counts/pix/sec', fontsize=20, fontweight='bold')
     ax.set_xlim(dark.min(), dark.max())
     ax.xaxis.set_major_formatter(FormatStrFormatter('%3.2e'))
 
@@ -95,8 +100,8 @@ def plot_histogram(dark, outname):
 
     #ax.set_xscale('log')
     ax.grid(True, which='both')
-    ax.set_ylabel('Log Frequency')
-    ax.set_xlabel('Counts/pix/sec')
+    ax.set_ylabel('Log Frequency', fontsize= 20, fontweight='bold')
+    ax.set_xlabel('Counts/pix/sec', fontsize= 20, fontweight='bold')
     ax.set_xlim(dark.min(), dark.max())
     ax.xaxis.set_major_formatter(FormatStrFormatter('%3.2e'))
 
@@ -139,6 +144,11 @@ def plot_time(detector, dark, date, temp, solar, solar_date, outname):
 
     """
     remove_if_there(outname)
+
+    plt.rc('font', weight='bold')
+    plt.rc('xtick.major', size=5, pad=7)
+    plt.rc('xtick', labelsize=20)
+
     fig = plt.figure(figsize=(20, 12))
 
     sorted_index = np.argsort(solar_date)
@@ -192,7 +202,7 @@ def plot_time(detector, dark, date, temp, solar, solar_date, outname):
                                       2 * 10 ** magnitude(dark.mean())))
 
     dark_ax.set_xticklabels(['' for item in dark_ax.get_xticklabels()])
-    dark_ax.set_ylabel('Mean Dark Rate cnts/sec/pix')
+    dark_ax.set_ylabel('Mean Dark Rate (cnts/sec/pix)', fontsize=20, fontweight='bold')
 
     if 'FUVA' in outname:
         segment = 'FUVA'
@@ -200,7 +210,7 @@ def plot_time(detector, dark, date, temp, solar, solar_date, outname):
         segment = 'FUVB'
     else:
         segment = 'NUV'
-    dark_ax.set_title('Global Dark Rate: %s' % (segment.upper()))
+    dark_ax.set_title('Global Dark Rate: %s' % (segment.upper()), fontsize=30, fontweight='bold')
     dark_ax.set_xlim(2009.5, date.max() + .1)
     dark_ax.legend(numpoints=1, shadow=True, loc='upper left')
     dark_ax.grid(True)
@@ -213,8 +223,8 @@ def plot_time(detector, dark, date, temp, solar, solar_date, outname):
                     markersize=8,
                     marker='o')
 
-        sub_ax.set_xlabel('Decimal Year')
-        sub_ax.set_ylabel('Temperature')
+        sub_ax.set_xlabel('Decimal Year', fontsize=25, fontweight='bold')
+        sub_ax.set_ylabel('Temperature', fontsize=20, fontweight='bold')
         sub_ax.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
         sub_ax.set_xlim(2009.5, date.max() + .1)
         #sub_ax.set_ylim(15, 27)
@@ -241,7 +251,7 @@ def plot_time(detector, dark, date, temp, solar, solar_date, outname):
                      zorder=1)
 
         sub_ax2.set_xticklabels(['' for item in dark_ax.get_xticklabels()])
-        sub_ax2.set_ylabel('Radio Flux')
+        sub_ax2.set_ylabel('Radio Flux', fontsize=20, fontweight='bold')
         sub_ax2.set_ylim(50, 210)
         sub_ax2.set_xlim(2009.5, date.max() + .1)
         sub_ax2.legend(numpoints=1, shadow=True, loc='best')
@@ -268,8 +278,8 @@ def plot_time(detector, dark, date, temp, solar, solar_date, outname):
                     alpha=1,
                     zorder=1)
         plt.gca().xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
-        sub_ax.set_xlabel('Decimal_year')
-        sub_ax.set_ylabel('Radio Flux')
+        sub_ax.set_xlabel('Decimal Year', fontsize=25, fontweight='bold')
+        sub_ax.set_ylabel('Radio Flux', fontsize=20, fontweight='bold')
         sub_ax.set_ylim(50, 210)
         sub_ax.set_xlim(2009.5, date.max() + .1)
         sub_ax.legend(numpoints=1, shadow=True, loc='best')

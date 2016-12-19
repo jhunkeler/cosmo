@@ -316,7 +316,7 @@ def send_email(missing_obs, missing_dates):
     message += ''.join(['{} {}\n'.format(obs, date) for obs, date in zip(missing_obs, missing_dates.iso)])
 
     svr_addr = 'smtp.stsci.edu'
-    from_addr = 'ely@stsci.edu'
+    from_addr = 'mfix@stsci.edu'
     #recipients = ['ely@stsci.edu', 'sahnow@stsci.edu', 'penton@stsci.edu', 'sonnentr@stsci.edu']
     recipients = 'mfix@stsci.edu'
     #to_addr = ', '.join(recipients)

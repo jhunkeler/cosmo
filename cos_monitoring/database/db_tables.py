@@ -81,7 +81,7 @@ class Files(Base):
     id = Column(Integer, primary_key=True)
 
     path = Column(String(70))
-    filename = Column(String(40))
+    filename = Column(String(50))
     rootname = Column(String(9))
 
     __table_args__ = (Index('idx_fullpath', 'path', 'filename', unique=True), )
@@ -253,7 +253,7 @@ class GainTrends(Base):
 
 #-------------------------------------------------------------------------------
 
-#-- NEW TABLES.
+#-- NEW FUV TABLES.
 
 #-------------------------------------------------------------------------------
 
@@ -264,14 +264,18 @@ class fuv_primary_headers(Base):
 
     id = Column(Integer, primary_key=True)
 
-    filename = Column(String(70))
+    filename = Column(String(50))
     rootname = Column(String(9))
     date_obs = Column(String(10))
+    detector = Column(String(5))
     imagetyp = Column(String(10))
     targname = Column(String(50))
     proposid = Column(Integer)
     ra_targ = Column(Float)
     dec_targ = Column(Float)
+    pr_inv_l = Column(String(30))
+    pr_inv_f = Column(String(20))
+    opus_ver = Column(String(20))
     obstype = Column(String(30))
     obsmode = Column(String(30))
     exptype = Column(String(30))
@@ -288,6 +292,205 @@ class fuv_primary_headers(Base):
     aperture = Column(String(15))
     opt_elem = Column(String(15))
     extended = Column(String(5))
+    obset_id = Column(String(20))
+    asn_id = Column(String(9))
+    asn_mtyp = Column(String(10))
 
     file_id = Column(Integer, ForeignKey(Files.id))
 #-------------------------------------------------------------------------------
+class fuva_raw_headers(Base):
+    'Table of raw fuva data'
+
+    __tablename__ = 'fuva_raw_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(50))
+    rootname = Column(String(9))
+    expstart = Column(Float)
+    expend = Column(Float)
+    rawtime = Column(Float)
+    neventsa = Column(Float)
+    deventa = Column(Float)
+    feventa = Column(Float)
+    hvlevela = Column(Integer)
+
+    file_id = Column(Integer, ForeignKey(Files.id))
+#-------------------------------------------------------------------------------
+class fuvb_raw_headers(Base):
+    'Table of raw fuvb data'
+
+    __tablename__ = 'fuvb_raw_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(50))
+    rootname = Column(String(9))
+    filename = Column(String(70))
+    expstart = Column(Float)
+    expend = Column(Float)
+    rawtime = Column(Float)
+    neventsb = Column(Float)
+    deventb = Column(Float)
+    feventb = Column(Float)
+    hvlevelb = Column(Integer)
+
+    file_id = Column(Integer, ForeignKey(Files.id))
+#-------------------------------------------------------------------------------
+class fuva_corr_headers(Base):
+    'Table of corr fuva data'
+
+    __tablename__ = 'fuva_corr_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(50))
+    rootname = Column(String(9))
+    shift1a = Column(Float)
+    shift2a = Column(Float)
+    sp_loc_a = Column(Float)
+    sp_off_a = Column(Float)
+    sp_err_a = Column(Float)
+    sp_nom_a = Column(Float)
+    sp_hgt_a = Column(Integer)
+    exptime = Column(Float)
+
+    file_id = Column(Integer, ForeignKey(Files.id))
+#-------------------------------------------------------------------------------
+class fuvb_corr_headers(Base):
+    'Table of corr fuvb data'
+
+    __tablename__ = 'fuvb_corr_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(50))
+    rootname = Column(String(9))
+    shift1b = Column(Float)
+    shift2b = Column(Float)
+    sp_loc_b = Column(Float)
+    sp_off_b = Column(Float)
+    sp_err_b = Column(Float)
+    sp_nom_b = Column(Float)
+    sp_hgt_b = Column(Integer)
+    exptime = Column(Float)
+
+    file_id = Column(Integer, ForeignKey(Files.id))
+#-------------------------------------------------------------------------------
+class fuv_x1d_headers(Base):
+    'Table of x1d fuv data'
+
+    __tablename__ = 'fuv_x1d_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(50))
+    rootname = Column(String(9))
+    min_wl = Column(Float)
+    max_wl = Column(Float)
+    min_flux = Column(Float)
+    max_flux = Column(Float)
+    mean_flux = Column(Float)
+    std_flux = Column(Float)
+
+    file_id = Column(Integer, ForeignKey(Files.id))
+#-------------------------------------------------------------------------------
+
+#-- NEW NUV TABLES.
+
+#-------------------------------------------------------------------------------
+
+class nuv_raw_headers(Base):
+    'Table of nuv keywords from rawtags'
+
+    __tablename__ = 'nuv_raw_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(50))
+    rootname = Column(String(9))
+    date_obs = Column(String(10))
+    detector = Column(String(5))
+    imagetyp = Column(String(10))
+    targname = Column(String(50))
+    proposid = Column(Integer)
+    ra_targ = Column(Float)
+    dec_targ = Column(Float)
+    pr_inv_l = Column(String(30))
+    pr_inv_f = Column(String(20))
+    opus_ver = Column(String(20))
+    obstype = Column(String(30))
+    obsmode = Column(String(30))
+    exptype = Column(String(30))
+    postarg1 = Column(Integer)
+    postarg2 = Column(Integer)
+    life_adj = Column(Integer)
+    fppos = Column(Integer)
+    exp_num = Column(Integer)
+    cenwave = Column(Integer)
+    propaper = Column(String(10))
+    apmpos = Column(String(10))
+    aperxpos = Column(Float)
+    aperypos = Column(Float)
+    aperture = Column(String(15))
+    opt_elem = Column(String(15))
+    extended = Column(String(5))
+    obset_id = Column(String(20))
+    asn_id = Column(String(9))
+    asn_mtyp = Column(String(10))
+    expstart = Column(Float)
+    expend = Column(Float)
+    exptime = Column(Float)
+    nevents = Column(Integer)
+
+    file_id = Column(Integer, ForeignKey(Files.id))
+#-------------------------------------------------------------------------------
+
+class nuv_corr_headers(Base):
+    'Table of nuv keywords from corrtags'
+
+    __tablename__ = 'nuv_corr_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(50))
+    rootname = Column(String(9))
+    shift1a = Column(Float)
+    shift1b = Column(Float)
+    shift1c = Column(Float)
+    shift1b = Column(Float)
+    shift2b = Column(Float)
+    shift2c = Column(Float)
+    sp_loc_a = Column(Float)
+    sp_loc_b = Column(Float)
+    sp_loc_c = Column(Float)
+    sp_off_a = Column(Float)
+    sp_off_b = Column(Float)
+    sp_off_c = Column(Float)
+    sp_nom_a = Column(Float)
+    sp_nom_b = Column(Float)
+    sp_nom_c = Column(Float)
+    sp_hgt_a = Column(Float)
+    sp_hgt_b = Column(Float)
+    sp_hgt_c = Column(Float)
+    exptime = Column(Float)
+
+    file_id = Column(Integer, ForeignKey(Files.id))
+#-------------------------------------------------------------------------------
+class nuv_x1d_headers(Base):
+    'Table of x1d nuv data'
+
+    __tablename__ = 'nuv_x1d_headers'
+
+    id = Column(Integer, primary_key=True)
+
+    filename = Column(String(50))
+    rootname = Column(String(9))
+    min_wl = Column(Float)
+    max_wl = Column(Float)
+    min_flux = Column(Float)
+    max_flux = Column(Float)
+    mean_flux = Column(Float)
+    std_flux = Column(Float)
+
+    file_id = Column(Integer, ForeignKey(Files.id))
