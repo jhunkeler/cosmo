@@ -1,4 +1,5 @@
-"""Script to monitor the COS FUV STIM pulses in TIME-TAG observations.
+"""
+Script to monitor the COS FUV STIM pulses in TIME-TAG observations.
 
 """
 
@@ -36,9 +37,16 @@ from ..utils import remove_if_there
 #-------------------------------------------------------------------------------
 
 def find_center(data):
-    """ Returns (height, x, y, width_x, width_y)
+    """
+    Returns (height, x, y, width_x, width_y)
     the gaussian parameters of a 2D distribution by calculating its
     moments
+
+    Parameters
+    ----------
+    data : array_like
+        A COS FUV corrtag image.
+
     """
     total = data.sum()
     if not total:
@@ -47,6 +55,9 @@ def find_center(data):
     X, Y = np.indices(data.shape)
     x = (X * data).sum() // total
     y = (Y * data).sum() // total
+
+    #-- Measure witdth and height, doesnt have any other use in the monitor.
+
     #col = data[:, int(y)]
     #width_x = np.sqrt(abs((np.arange(col.size) - y) ** 2 * col).sum() / col.sum())
     #row = data[int(x), :]
@@ -58,8 +69,25 @@ def find_center(data):
 #-------------------------------------------------------------------------------
 
 def brf_positions(brftab, segment, position):
-    """ Gets the search ranges for a stimpulse from
+    """
+    Gets the search ranges for a stimpulse from
     the given baseline reference table
+
+    Parameters
+    ----------
+    brftab : str
+        path of BRF reference file.
+    segment : str
+        COS FUV segment
+    position : str
+        which stim position 'ul' for upper left, 'lr' lower right.
+
+    Returns
+    -------
+    xmin :
+    xmax :
+    ymin :
+    ymax :
     """
     brf = fits.getdata(brftab)
 
@@ -92,6 +120,27 @@ def brf_positions(brftab, segment, position):
 #-------------------------------------------------------------------------------
 
 def find_stims(image, segment, stim, brf_file):
+    """
+    Find stim positions.
+
+    Parameters
+    ----------
+    image : array_like
+
+    segment : str
+        COS FUV segement
+    stim : str
+        stim position 'ul' for upper left, 'lr' lower right.
+    brf_file : str
+        path of BRF reference file
+
+    Returns
+    -------
+    found_x + x1 : float(?)
+        center of stim pulse + scaling factor
+    found_y + y1 : float(?)
+        center of stim pulse + scaling factor
+    """
     x1, x2, y1, y2 = brf_positions(brf_file, segment, stim)
     found_x, found_y = find_center(image[y1:y2, x1:x2])
     if (not found_x) and (not found_y):
@@ -103,14 +152,37 @@ def find_stims(image, segment, stim, brf_file):
 
 def locate_stims(fits_file, start=0, increment=None, brf_file=None):
 
+    """
+    Locate the stim pulse positions
+
+    Parameters
+    ----------
+    fits_file : str
+        COS FUV corrtag path
+    start : float
+        Start time of observation
+    increment : into
+        MJD time step.
+    brf_file : str
+        Path of COS BRFTAB.
+
+    Yields
+    ------
+    stim_info : dict
+        Dictionaty of stim meta data for COSMO
+    """
     ### change this to pull brf file from the header if not specified
     if not brf_file:
-        brf_file = os.path.join(os.environ['lref'], 's7g1700el_brf.fits')
+        try:
+            brf_file = fits.getval(fits_file, keyword='brftab', ext=0)
+        except KeyError:
+            brf_file = os.path.join(os.environ['lref'], 'x1u1459il_brf.fits')
 
     DAYS_PER_SECOND = 1. / 60. / 60. / 24.
 
     file_path, file_name = os.path.split(fits_file)
 
+    #-- Begin to gather meta data.
     with fits.open(fits_file) as hdu:
         exptime = hdu[1].header['exptime']
         expstart = hdu[1].header['expstart']
@@ -119,17 +191,19 @@ def locate_stims(fits_file, start=0, increment=None, brf_file=None):
         stim_info = {'rootname': hdu[0].header['rootname'],
                      'segment': segment}
 
+        #-- See if corrtag has data
         try:
             hdu[1].data
         except:
             yield stim_info
             raise StopIteration
 
+        #-- If the data extension has no length, stop iteration.
         if not len(hdu[1].data):
             yield stim_info
             raise StopIteration
 
-        # If increment is not supplied, use the rates supplied by the detector
+        #-- If increment is not supplied, use the rates supplied by the detector
         if not increment:
             if exptime < 10:
                 increment = .03
@@ -142,8 +216,9 @@ def locate_stims(fits_file, start=0, increment=None, brf_file=None):
 
         stop = start + increment
 
-        # Iterate from start to stop, excluding final bin if smaller than increment
+        #-- Iterate from start to stop, excluding final bin if smaller than increment
         start_times = np.arange(start, exptime-increment, increment)
+
         if not len(start_times):
             yield stim_info
 
@@ -156,8 +231,8 @@ def locate_stims(fits_file, start=0, increment=None, brf_file=None):
 
             events = events[data_index]
 
-            # Call for this is x_values, y_values, image to bin to, offset in x
-            # ccos.binevents(x, y, array, x_offset, dq, sdqflags, epsilon)
+            #-- Call for this is x_values, y_values, image to bin to, offset in x
+            #ccos.binevents(x, y, array, x_offset, dq, sdqflags, epsilon)
             im = np.zeros((1024, 16384)).astype(np.float32)
             ccos.binevents(events['RAWX'].astype(np.float32),
                            events['RAWY'].astype(np.float32),
@@ -166,11 +241,14 @@ def locate_stims(fits_file, start=0, increment=None, brf_file=None):
                            events['dq'],
                            0)
 
+            #-- ABS_TIME is the absolute time, MJD, not time in seconds since the exposure started.
             ABS_TIME = expstart + sub_start * DAYS_PER_SECOND
 
+            #-- Send call to locate the stim pulses for upper left and lower right locations.
             found_ul_x, found_ul_y = find_stims(im, segment, 'ul', brf_file)
             found_lr_x, found_lr_y = find_stims(im, segment, 'lr', brf_file)
 
+            #-- Round up and add meta data to dictionary.
             stim_info['time'] = round(sub_start, 5)
             stim_info['abs_time'] = round(ABS_TIME, 5)
             stim_info['stim1_x'] = round(found_ul_x, 3)
@@ -184,8 +262,20 @@ def locate_stims(fits_file, start=0, increment=None, brf_file=None):
 #-----------------------------------------------------
 
 def find_missing():
-    """Return list of datasets that had a missing stim in
+    """
+    Return list of datasets that had a missing stim in
     any time period.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    obs_uniq : array_like
+        unique list of observation with miss stim pulses
+    date_uniq : array_like
+        unique list of dates for missing stim pulse observations
     """
 
     SETTINGS = open_settings()
@@ -217,10 +307,18 @@ def find_missing():
 #-------------------------------------------------------------------------------
 
 def check_individual(out_dir, connection_string):
-    """Run tests on each individual datasets.
+    """
+    Run tests on each individual datasets.
 
     Currently checks if any coordinate deviates from the mean
     over the exposure and produces a plot if so.
+
+    Parameters
+    ----------
+    out_dir : str
+        path of output directory
+    connection_string : str
+        string of database credentials.
 
     """
 
@@ -258,7 +356,8 @@ def check_individual(out_dir, connection_string):
 #-------------------------------------------------------------------------------
 
 def stim_monitor():
-    """Main function to monitor the stim pulses in COS observations
+    """
+    Main function to monitor the stim pulses in COS observations
 
     1: populate the database
     2: find any datasets with missing stims [send email]
@@ -266,6 +365,9 @@ def stim_monitor():
     4: move plots to webpage
     5: check over individual observations
 
+    Parameters
+    ----------
+    None
     """
 
     logger.info("Starting Monitor")
@@ -293,13 +395,21 @@ def stim_monitor():
 #-------------------------------------------------------------------------------
 
 def send_email(missing_obs, missing_dates):
-    """inform the parties that retrieval and calibration are done
+    """
+    email inform to the parties that retrieval and calibration are done
 
+    Parameters
+    ----------
+    missing_obs : array_like
+        a list of observations with missing stim pulse information
+    missing_dates : array_like
+        a list of dates for missing stim pulse information
     """
     sorted_index = np.argsort(np.array(missing_dates))
     missing_obs = np.array(missing_obs)[sorted_index]
     missing_dates = missing_dates[sorted_index]
 
+    #-- Begin building message.
     date_now = datetime.date.today()
     date_now = Time('%d-%d-%d' % (date_now.year, date_now.month, date_now.day), scale='utc', format='iso')
     date_diff = (date_now - missing_dates).sec / (60. * 60. * 24)
@@ -315,8 +425,13 @@ def send_email(missing_obs, missing_dates):
     message += '-' * 40 + '\n'
     message += ''.join(['{} {}\n'.format(obs, date) for obs, date in zip(missing_obs, missing_dates.iso)])
 
+    #-- STScI mail server
     svr_addr = 'smtp.stsci.edu'
+
+    #-- From address
     from_addr = 'mfix@stsci.edu'
+
+    #-- Send to
     #recipients = ['ely@stsci.edu', 'sahnow@stsci.edu', 'penton@stsci.edu', 'sonnentr@stsci.edu']
     recipients = 'mfix@stsci.edu'
     #to_addr = ', '.join(recipients)
@@ -327,6 +442,7 @@ def send_email(missing_obs, missing_dates):
     #msg['To'] = to_addr
     msg['To'] = recipients
 
+    #-- Send the thing.
     msg.attach(MIMEText(message))
     try:
         s = smtplib.SMTP(svr_addr)
@@ -338,13 +454,21 @@ def send_email(missing_obs, missing_dates):
 #-------------------------------------------------------------------------------
 
 def make_plots(out_dir, connection_string):
-    """Make the overall STIM monitor plots.
+    """
+    Make the overall STIM monitor plots.
     They will all be output to out_dir.
+
+    Parameters
+    ----------
+    out_dir : str
+        path to the output directory
+    connection_string :
+        string of database credentials.
     """
 
     plt.ioff()
 
-    brf_file = os.path.join(os.environ['lref'], 's7g1700el_brf.fits')
+    brf_file = os.path.join(os.environ['lref'], 'x1u1459il_brf.fits')
 
     brf = fits.getdata(brf_file, 1)
 
@@ -353,6 +477,7 @@ def make_plots(out_dir, connection_string):
     plt.figure(1, figsize=(18, 12))
     plt.grid(True)
 
+    #-- Query All data from stims table for FUVA upper left stim pulse
     data = engine.execute("""SELECT stim1_x, stim1_y
                                     FROM stims
                                     JOIN headers on stims.rootname = headers.rootname
@@ -361,18 +486,25 @@ def make_plots(out_dir, connection_string):
                                         stims.stim1_y != -999 AND
                                         stims.stim2_x != -999 AND
                                         stims.stim2_y != -999;""")
+
+    #-- Cast data as python list.
     data = [line for line in data]
     plt.subplot(2, 2, 1)
+
+    #-- Seperate list in to x & y coordinates.
     x = [line.stim1_x for line in data]
     y = [line.stim1_y for line in data]
+
     plt.plot(x, y, 'b.', alpha=.7)
     plt.xlabel('x')
     plt.ylabel('y')
     plt.title('Segment A: Stim A (Upper Left)')
+
     xcenter = brf[0]['SX1']
     ycenter = brf[0]['SY1']
     xwidth = brf[0]['XWIDTH']
     ywidth = brf[0]['YWIDTH']
+
     xs = [xcenter - xwidth,
           xcenter + xwidth,
           xcenter + xwidth,
@@ -383,6 +515,7 @@ def make_plots(out_dir, connection_string):
           ycenter + ywidth,
           ycenter + ywidth,
           ycenter - ywidth]
+
     plt.plot(xs, ys, color='r', linestyle='--', label='Search Box')
     plt.legend(shadow=True, numpoints=1)
     plt.xlabel('RAWX')
@@ -390,6 +523,7 @@ def make_plots(out_dir, connection_string):
     #plt.set_xlims(xcenter - 2*xwidth, xcenter + 2*xwidth)
     #plt.set_ylims(ycenter - 2*ywidth, ycenter - 2*ywidth)
 
+    #-- Query All data from stims table for FUVA lower right stim pulse
     data = engine.execute("""SELECT stim2_x, stim2_y
                                     FROM stims
                                     JOIN headers on stims.rootname = headers.rootname
@@ -399,17 +533,22 @@ def make_plots(out_dir, connection_string):
                                         stims.stim2_x != -999 AND
                                         stims.stim2_y != -999;""")
     data = [line for line in data]
+
     plt.subplot(2, 2, 2)
+
     x = [line.stim2_x for line in data]
     y = [line.stim2_y for line in data]
+
     plt.plot(x, y, 'r.', alpha=.7)
     plt.xlabel('x')
     plt.ylabel('y')
     plt.title('Segment A: Stim B (Lower Right)')
+
     xcenter = brf[0]['SX2']
     ycenter = brf[0]['SY2']
     xwidth = brf[0]['XWIDTH']
     ywidth = brf[0]['YWIDTH']
+
     xs = [xcenter - xwidth,
           xcenter + xwidth,
           xcenter + xwidth,
@@ -420,11 +559,13 @@ def make_plots(out_dir, connection_string):
           ycenter + ywidth,
           ycenter + ywidth,
           ycenter - ywidth]
+
     plt.plot(xs, ys, color='r', linestyle='--', label='Search Box')
     plt.legend(shadow=True, numpoints=1)
     plt.xlabel('RAWX')
     plt.ylabel('RAWY')
 
+    #-- Query All data from stims table for FUVB upper left stim pulse
     data = engine.execute("""SELECT stim1_x, stim1_y
                                     FROM stims
                                     JOIN headers on stims.rootname = headers.rootname
@@ -434,17 +575,22 @@ def make_plots(out_dir, connection_string):
                                         stims.stim2_x != -999 AND
                                         stims.stim2_y != -999;""")
     data = [line for line in data]
+
     plt.subplot(2, 2, 3)
+
     x = [line.stim1_x for line in data]
     y = [line.stim1_y for line in data]
+
     plt.plot(x, y, 'b.', alpha=.7)
     plt.xlabel('x')
     plt.ylabel('y')
     plt.title('Segment B: Stim A (Upper Left)')
+
     xcenter = brf[1]['SX1']
     ycenter = brf[1]['SY1']
     xwidth = brf[1]['XWIDTH']
     ywidth = brf[1]['YWIDTH']
+
     xs = [xcenter - xwidth,
           xcenter + xwidth,
           xcenter + xwidth,
@@ -455,11 +601,13 @@ def make_plots(out_dir, connection_string):
           ycenter + ywidth,
           ycenter + ywidth,
           ycenter - ywidth]
+
     plt.plot(xs, ys, color='r', linestyle='--', label='Search Box')
     plt.legend(shadow=True, numpoints=1)
     plt.xlabel('RAWX')
     plt.ylabel('RAWY')
 
+    #-- Query All data from stims table for FUVB lower right stim pulse
     data = engine.execute("""SELECT stim2_x, stim2_y
                                     FROM stims
                                     JOIN headers on stims.rootname = headers.rootname
@@ -471,16 +619,20 @@ def make_plots(out_dir, connection_string):
     data = [line for line in data]
 
     plt.subplot(2, 2, 4)
+
     x = [line.stim2_x for line in data]
     y = [line.stim2_y for line in data]
+
     plt.plot(x, y, 'r.', alpha=.7)
     plt.xlabel('x')
     plt.ylabel('y')
     plt.title('Segment B: Stim B (Lower Right)')
+
     xcenter = brf[1]['SX2']
     ycenter = brf[1]['SY2']
     xwidth = brf[1]['XWIDTH']
     ywidth = brf[1]['YWIDTH']
+
     xs = [xcenter - xwidth,
           xcenter +xwidth,
           xcenter + xwidth,
@@ -491,6 +643,7 @@ def make_plots(out_dir, connection_string):
           ycenter + ywidth,
           ycenter + ywidth,
           ycenter - ywidth]
+
     plt.plot(xs, ys, color='r', linestyle='--', label='Search Box')
     plt.legend(shadow=True, numpoints=1)
     plt.xlabel('RAWX')
@@ -516,6 +669,7 @@ def make_plots(out_dir, connection_string):
             ax.set_xlabel('MJD')
             ax.set_ylabel('Coordinate')
 
+            #-- Retrieve all coordinates and time.
             query = """SELECT stims.abs_time, stims.{}
                               FROM stims
                               JOIN headers ON stims.rootname = headers.rootname
@@ -524,13 +678,16 @@ def make_plots(out_dir, connection_string):
                                   stims.stim1_y != -999 AND
                                   stims.stim2_x != -999 AND
                                   stims.stim2_y != -999;""".format(column, segment)
+
+            #-- Type cast to python list
             data = [line for line in engine.execute(query)]
 
-
+            #-- Seperate time and coordinate info.
             times = [line[0] for line in data]
             coords = [line[1] for line in data]
             ax.plot(times, coords, 'o')
 
+        #-- Remove and replace plot if it exists.
         remove_if_there(os.path.join(out_dir, 'STIM_locations_vs_time_%s.png' %
                                                                     (segment)))
         fig.savefig(os.path.join(out_dir, 'STIM_locations_vs_time_%s.png' %
@@ -548,6 +705,7 @@ def make_plots(out_dir, connection_string):
         fig.suptitle("Strech and Midpoint vs time")
 
         ax1 = fig.add_subplot(2, 2, 1)
+
         query = """SELECT stims.abs_time, stims.stim2_x - stims.stim1_x as stretch
                           FROM stims
                           JOIN headers ON stims.rootname = headers.rootname
@@ -556,7 +714,9 @@ def make_plots(out_dir, connection_string):
                               stims.stim1_y != -999 AND
                               stims.stim2_x != -999 AND
                               stims.stim2_y != -999;""".format(segment)
+
         data = [line for line in engine.execute(query)]
+
         stretch = [line.stretch for line in data]
         times = [line.abs_time for line in data]
 
@@ -565,6 +725,7 @@ def make_plots(out_dir, connection_string):
         ax1.set_ylabel('Stretch X')
 
         ax2 = fig.add_subplot(2, 2, 2)
+
         query = """SELECT stims.abs_time, .5*(stims.stim2_x + stims.stim1_x) as midpoint
                           FROM stims
                           JOIN headers ON stims.rootname = headers.rootname
@@ -573,6 +734,7 @@ def make_plots(out_dir, connection_string):
                               stims.stim1_y != -999 AND
                               stims.stim2_x != -999 AND
                               stims.stim2_y != -999;""".format(segment)
+
         data = [line for line in engine.execute(query)]
         midpoint = [line.midpoint for line in data]
         times = [line.abs_time for line in data]
@@ -582,6 +744,7 @@ def make_plots(out_dir, connection_string):
         ax2.set_ylabel('Midpoint X')
 
         ax3 = fig.add_subplot(2, 2, 3)
+
         query = """SELECT stims.abs_time, stims.stim2_y - stims.stim1_y as stretch
                           FROM stims
                           JOIN headers ON stims.rootname = headers.rootname
@@ -590,14 +753,18 @@ def make_plots(out_dir, connection_string):
                               stims.stim1_y != -999 AND
                               stims.stim2_x != -999 AND
                               stims.stim2_y != -999;""".format(segment)
+
         data = [line for line in engine.execute(query)]
+
         stretch = [line.stretch for line in data]
         times = [line.abs_time for line in data]
+
         ax3.plot(times, stretch, 'o')
         ax3.set_xlabel('MJD')
         ax3.set_ylabel('Stretch Y')
 
         ax4 = fig.add_subplot(2, 2, 4)
+
         query = """SELECT stims.abs_time, .5*(stims.stim2_y + stims.stim1_y) as midpoint
                           FROM stims
                           JOIN headers ON stims.rootname = headers.rootname
@@ -606,6 +773,7 @@ def make_plots(out_dir, connection_string):
                               stims.stim1_y != -999 AND
                               stims.stim2_x != -999 AND
                               stims.stim2_y != -999;""".format(segment)
+
         ax4.plot(times, midpoint, 'o')
         ax4.set_xlabel('MJD')
         ax4.set_ylabel('Midpoint Y')
@@ -655,6 +823,7 @@ def make_plots(out_dir, connection_string):
                                         stims.stim1_y != -999 AND
                                         stims.stim2_x != -999 AND
                                         stims.stim2_y != -999;""")
+
     data = [line for line in data]
 
     y1 = [float(line.stim1_y) for line in data]
@@ -662,12 +831,11 @@ def make_plots(out_dir, connection_string):
 
     im, nothin1, nothin2 = np.histogram2d(y2, y1, bins=200)
     im = np.log(im)
+
     ax.imshow(im, aspect='auto', interpolation='none')
     ax.set_xlabel('y1')
     ax.set_ylabel('y2')
     ax.set_title('Segment A: Y vs Y')
-
-
 
     ax = fig.add_subplot(2, 2, 3)
     ax.grid(True)
@@ -680,6 +848,7 @@ def make_plots(out_dir, connection_string):
                                             stims.stim1_y != -999 AND
                                             stims.stim2_x != -999 AND
                                             stims.stim2_y != -999;""")
+
     data = [line for line in data]
 
     x1 = [float(line.stim1_x) for line in data]
@@ -692,8 +861,6 @@ def make_plots(out_dir, connection_string):
     ax.set_ylabel('x2')
     ax.set_title('Segment B: X vs X')
 
-
-
     ax = fig.add_subplot(2, 2, 4)
     ax.grid(True)
 
@@ -705,6 +872,7 @@ def make_plots(out_dir, connection_string):
                                             stims.stim1_y != -999 AND
                                             stims.stim2_x != -999 AND
                                             stims.stim2_y != -999;""")
+
     data = [line for line in data]
 
     y1 = [float(line.stim1_y) for line in data]
@@ -712,6 +880,7 @@ def make_plots(out_dir, connection_string):
 
     im, nothin1, nothin2 = np.histogram2d(y2, y1, bins=200)
     im = np.log(im)
+
     ax.imshow(im, aspect='auto', interpolation='none')
     ax.set_xlabel('y1')
     ax.set_ylabel('y2')
@@ -785,6 +954,23 @@ def make_plots(out_dir, connection_string):
 #-------------------------------------------------------------------------------
 
 def trend(val1, val2):
+    """
+    Calculate a linear least-squares regression for two sets of measurements.
+
+    Parameters
+    ----------
+    val1 : array_like
+        set of measurements
+    val2 : array_like
+        set of measurements
+
+    Returns
+    -------
+    slope : float
+        Slope of linear regression line.
+    intercept : float
+        Intercept of regression line.
+    """
     val1 = np.array(val1)
     val2 = np.array(val2)
 
@@ -795,11 +981,20 @@ def trend(val1, val2):
 #-------------------------------------------------------------------------------
 
 def move_to_web(data_dir, web_dir):
-    """Copy output products to web-facing directories.
+    """
+    Copy output products to web-facing directories.
 
     Simple function to move created plots in the data_dir
     to the web_dir.  Will move all files that match the string
     STIM*.p* and then change permissions to 777.
+
+    Parameters
+    ----------
+    data_dir : str
+        Location of data
+    web_dir : str
+        Location of directory for figures to place on website.
+
     """
 
     for item in glob.glob(os.path.join(data_dir, 'STIM*.p*')):
