@@ -350,9 +350,9 @@ def populate_stims(num_cpu=1):
     Session, engine = load_connection(settings['connection_string'])
     session = Session()
 
-    files_to_add = [(result.id, os.path.join(result.path, result.name))
+    files_to_add = [(result.id, os.path.join(result.path, result.filename))
                         for result in session.query(Files).\
-                                filter(Files.name.like('%corrtag\_%')).\
+                                filter(Files.filename.like('%corrtag\_%')).\
                                 outerjoin(Stims, Files.id == Stims.file_id).\
                                 filter(Stims.file_id == None)]
     session.close()
@@ -599,38 +599,38 @@ def ingest_all():
 
 
     #-- Ingest all files into DB.
-    insert_files(**settings)
+    #insert_files(**settings)
 
     #-------------------------------------------------------
     #-- Populate FUV data
 
     #-- Populate FUV shared primary header info
-    populate_table(fuv_primary_headers, '%_rawtag_a.fits%', fuv_primary_keys, settings['num_cpu'])
+    #populate_table(fuv_primary_headers, '%_rawtag_a.fits%', fuv_primary_keys, settings['num_cpu'])
     #-- Does this in 2 steps, checks to make sure that if A shares B rootname then skip.
-    populate_table(fuv_primary_headers, '%_rawtag_b.fits%', fuv_primary_keys, settings['num_cpu'])
+    #populate_table(fuv_primary_headers, '%_rawtag_b.fits%', fuv_primary_keys, settings['num_cpu'])
 
     #-- Populate FUV Raw data
-    populate_table(fuva_raw_headers, '%_rawtag_a.fits%', fuva_raw_keys, settings['num_cpu'])
-    populate_table(fuvb_raw_headers, '%_rawtag_b.fits%', fuvb_raw_keys, settings['num_cpu'])
+    #populate_table(fuva_raw_headers, '%_rawtag_a.fits%', fuva_raw_keys, settings['num_cpu'])
+    #populate_table(fuvb_raw_headers, '%_rawtag_b.fits%', fuvb_raw_keys, settings['num_cpu'])
 
     #-- Populate FUV Corrtags
-    populate_table(fuva_corr_headers, '%_corrtag_a.fits%', fuva_corr_keys, settings['num_cpu'])
-    populate_table(fuvb_corr_headers, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'])
+    #populate_table(fuva_corr_headers, '%_corrtag_a.fits%', fuva_corr_keys, settings['num_cpu'])
+    #populate_table(fuvb_corr_headers, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'])
 
     #-- Populate FUV x1d
-    populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
+    #populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
 
     #-------------------------------------------------------
     #-- Populate NUV data
 
     #-- Populate NUV Raw data
-    populate_table(nuv_raw_headers, '%_rawtag.fits%', nuv_raw_keys, settings['num_cpu'])
+    #populate_table(nuv_raw_headers, '%_rawtag.fits%', nuv_raw_keys, settings['num_cpu'])
 
     #-- Populate NUV Corrtags
-    populate_table(nuv_corr_headers, '%_corrtag.fits%', nuv_corr_keys, settings['num_cpu'])
+    #populate_table(nuv_corr_headers, '%_corrtag.fits%', nuv_corr_keys, settings['num_cpu'])
 
     #-- Populate NUV x1d
-    populate_table(nuv_x1d_headers, 'l%\_x1d%', nuv_x1d_keys, settings['num_cpu'])
+    #populate_table(nuv_x1d_headers, 'l%\_x1d%', nuv_x1d_keys, settings['num_cpu'])
 
     #-------------------------------------------------------
     #-- Populate monitor tables
@@ -639,7 +639,7 @@ def ingest_all():
     #populate_lampflash(settings['num_cpu'])
     #populate_darks(settings['num_cpu'])
     #populate_gain(settings['num_cpu'])
-    #populate_stims(settings['num_cpu'])
+    populate_stims(settings['num_cpu'])
     #populate_acqs(settings['num_cpu'])
 #-------------------------------------------------------------------------------
 

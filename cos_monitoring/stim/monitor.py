@@ -34,6 +34,7 @@ from email.mime.multipart import MIMEMultipart
 from ..database.db_tables import open_settings, load_connection
 from ..utils import remove_if_there
 
+LREF = '/grp/crds/hst/references/hst/'
 #-------------------------------------------------------------------------------
 
 def find_center(data):
@@ -84,11 +85,16 @@ def brf_positions(brftab, segment, position):
 
     Returns
     -------
-    xmin :
-    xmax :
-    ymin :
-    ymax :
+    xmin : int
+        minimum x for stim search box
+    xmax : int
+        maximum x for stim search box
+    ymin : int
+        y minimum for stim search box
+    ymax : int
+        y maximum for stim search box
     """
+
     brf = fits.getdata(brftab)
 
     if segment == 'FUVA':
@@ -171,12 +177,18 @@ def locate_stims(fits_file, start=0, increment=None, brf_file=None):
     stim_info : dict
         Dictionaty of stim meta data for COSMO
     """
-    ### change this to pull brf file from the header if not specified
+    #-- Change this to pull brf file from the header if not specified.
+
+
     if not brf_file:
-        try:
-            brf_file = fits.getval(fits_file, keyword='brftab', ext=0)
-        except KeyError:
-            brf_file = os.path.join(os.environ['lref'], 'x1u1459il_brf.fits')
+        brf_file = os.path.join(LREF, 'x1u1459il_brf.fits')
+
+        #-- Throws errors because files dont exist, adds blank entry.
+        #try:
+        #    brf_file = fits.getval(fits_file, keyword='brftab', ext=0)
+        #    brf_file = os.path.join(LREF, brf_file.split('$')[1])
+        #except KeyError:
+        #    brf_file = os.path.join(LREF, 'x1u1459il_brf.fits')
 
     DAYS_PER_SECOND = 1. / 60. / 60. / 24.
 
