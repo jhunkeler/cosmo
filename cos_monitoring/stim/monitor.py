@@ -294,13 +294,13 @@ def find_missing():
     Session, engine = load_connection(SETTINGS['connection_string'])
 
     data = engine.execute("""SELECT headers.rootname,stims.abs_time
-                                    FROM stims
-                                    JOIN headers ON stims.rootname = headers.rootname
-                                    WHERE stims.stim1_x = -999
-                                        OR stims.stim1_y = -999
-                                        OR stims.stim2_x = -999
-                                        OR stims.stim2_y = -999
-                                    ORDER BY stims.abs_time""")
+                               FROM stims
+                               JOIN headers ON stims.rootname = headers.rootname
+                              WHERE stims.stim1_x = -999
+                                 OR stims.stim1_y = -999
+                                 OR stims.stim2_x = -999
+                                 OR stims.stim2_y = -999
+                           ORDER BY stims.abs_time """)
 
     missed_data = [(item[0].strip(), float(item[1])) for item in data]
     all_obs = [item[0] for item in missed_data]
@@ -491,13 +491,13 @@ def make_plots(out_dir, connection_string):
 
     #-- Query All data from stims table for FUVA upper left stim pulse
     data = engine.execute("""SELECT stim1_x, stim1_y
-                                    FROM stims
-                                    JOIN headers on stims.rootname = headers.rootname
-                                    WHERE headers.segment = 'FUVA' AND
-                                        stims.stim1_x != -999 AND
-                                        stims.stim1_y != -999 AND
-                                        stims.stim2_x != -999 AND
-                                        stims.stim2_y != -999;""")
+                               FROM stims
+                               JOIN headers on stims.rootname = headers.rootname
+                              WHERE headers.segment = 'FUVA'
+                                AND stims.stim1_x != -999
+                                AND stims.stim1_y != -999
+                                AND stims.stim2_x != -999
+                                AND stims.stim2_y != -999;""")
 
     #-- Cast data as python list.
     data = [line for line in data]
@@ -537,13 +537,14 @@ def make_plots(out_dir, connection_string):
 
     #-- Query All data from stims table for FUVA lower right stim pulse
     data = engine.execute("""SELECT stim2_x, stim2_y
-                                    FROM stims
-                                    JOIN headers on stims.rootname = headers.rootname
-                                    WHERE headers.segment = 'FUVA' AND
-                                        stims.stim1_x != -999 AND
-                                        stims.stim1_y != -999 AND
-                                        stims.stim2_x != -999 AND
-                                        stims.stim2_y != -999;""")
+                               FROM stims
+                               JOIN headers ON stims.rootname = headers.rootname
+                              WHERE headers.segment = 'FUVA'
+                                AND stims.stim1_x != -999
+                                AND stims.stim1_y != -999
+                                AND stims.stim2_x != -999
+                                AND stims.stim2_y != -999;""")
+
     data = [line for line in data]
 
     plt.subplot(2, 2, 2)
@@ -579,13 +580,14 @@ def make_plots(out_dir, connection_string):
 
     #-- Query All data from stims table for FUVB upper left stim pulse
     data = engine.execute("""SELECT stim1_x, stim1_y
-                                    FROM stims
-                                    JOIN headers on stims.rootname = headers.rootname
-                                    WHERE headers.segment = 'FUVB' AND
-                                        stims.stim1_x != -999 AND
-                                        stims.stim1_y != -999 AND
-                                        stims.stim2_x != -999 AND
-                                        stims.stim2_y != -999;""")
+                               FROM stims
+                               JOIN headers ON stims.rootname = headers.rootname
+                              WHERE headers.segment = 'FUVB'
+                                AND stims.stim1_x != -999
+                                AND stims.stim1_y != -999
+                                AND stims.stim2_x != -999
+                                AND stims.stim2_y != -999;""")
+
     data = [line for line in data]
 
     plt.subplot(2, 2, 3)
@@ -621,13 +623,14 @@ def make_plots(out_dir, connection_string):
 
     #-- Query All data from stims table for FUVB lower right stim pulse
     data = engine.execute("""SELECT stim2_x, stim2_y
-                                    FROM stims
-                                    JOIN headers on stims.rootname = headers.rootname
-                                    WHERE headers.segment = 'FUVB' AND
-                                        stims.stim1_x != -999 AND
-                                        stims.stim1_y != -999 AND
-                                        stims.stim2_x != -999 AND
-                                        stims.stim2_y != -999;""")
+                               FROM stims
+                               JOIN headers ON stims.rootname = headers.rootname
+                              WHERE headers.segment = 'FUVB'
+                                AND stims.stim1_x != -999
+                                AND stims.stim1_y != -999
+                                AND stims.stim2_x != -999
+                                AND stims.stim2_y != -999;""")
+
     data = [line for line in data]
 
     plt.subplot(2, 2, 4)
@@ -683,13 +686,13 @@ def make_plots(out_dir, connection_string):
 
             #-- Retrieve all coordinates and time.
             query = """SELECT stims.abs_time, stims.{}
-                              FROM stims
-                              JOIN headers ON stims.rootname = headers.rootname
-                              WHERE headers.segment = '{}' AND
-                                  stims.stim1_x != -999 AND
-                                  stims.stim1_y != -999 AND
-                                  stims.stim2_x != -999 AND
-                                  stims.stim2_y != -999;""".format(column, segment)
+                         FROM stims
+                         JOIN headers ON stims.rootname = headers.rootname
+                        WHERE headers.segment = '{}'
+                          AND stims.stim1_x != -999
+                          AND stims.stim1_y != -999
+                          AND stims.stim2_x != -999
+                          AND stims.stim2_y != -999;""".format(column, segment)
 
             #-- Type cast to python list
             data = [line for line in engine.execute(query)]
@@ -718,14 +721,14 @@ def make_plots(out_dir, connection_string):
 
         ax1 = fig.add_subplot(2, 2, 1)
 
-        query = """SELECT stims.abs_time, stims.stim2_x - stims.stim1_x as stretch
-                          FROM stims
-                          JOIN headers ON stims.rootname = headers.rootname
-                          WHERE headers.segment = '{}' AND
-                              stims.stim1_x != -999 AND
-                              stims.stim1_y != -999 AND
-                              stims.stim2_x != -999 AND
-                              stims.stim2_y != -999;""".format(segment)
+        query = """SELECT stims.abs_time, stims.stim2_x - stims.stim1_x AS stretch
+                     FROM stims
+                     JOIN headers ON stims.rootname = headers.rootname
+                    WHERE headers.segment = '{}'
+                      AND stims.stim1_x != -999
+                      AND stims.stim1_y != -999
+                      AND stims.stim2_x != -999
+                      AND stims.stim2_y != -999;""".format(segment)
 
         data = [line for line in engine.execute(query)]
 
@@ -738,14 +741,14 @@ def make_plots(out_dir, connection_string):
 
         ax2 = fig.add_subplot(2, 2, 2)
 
-        query = """SELECT stims.abs_time, .5*(stims.stim2_x + stims.stim1_x) as midpoint
-                          FROM stims
-                          JOIN headers ON stims.rootname = headers.rootname
-                          WHERE headers.segment = '{}' AND
-                              stims.stim1_x != -999 AND
-                              stims.stim1_y != -999 AND
-                              stims.stim2_x != -999 AND
-                              stims.stim2_y != -999;""".format(segment)
+        query = """SELECT stims.abs_time, .5*(stims.stim2_x + stims.stim1_x) AS midpoint
+                     FROM stims
+                     JOIN headers ON stims.rootname = headers.rootname
+                    WHERE headers.segment = '{}'
+                      AND stims.stim1_x != -999
+                      AND stims.stim1_y != -999
+                      AND stims.stim2_x != -999
+                      AND stims.stim2_y != -999;""".format(segment)
 
         data = [line for line in engine.execute(query)]
         midpoint = [line.midpoint for line in data]
@@ -758,13 +761,13 @@ def make_plots(out_dir, connection_string):
         ax3 = fig.add_subplot(2, 2, 3)
 
         query = """SELECT stims.abs_time, stims.stim2_y - stims.stim1_y as stretch
-                          FROM stims
-                          JOIN headers ON stims.rootname = headers.rootname
-                          WHERE headers.segment = '{}' AND
-                              stims.stim1_x != -999 AND
-                              stims.stim1_y != -999 AND
-                              stims.stim2_x != -999 AND
-                              stims.stim2_y != -999;""".format(segment)
+                     FROM stims
+                     JOIN headers ON stims.rootname = headers.rootname
+                    WHERE headers.segment = '{}'
+                      AND stims.stim1_x != -999
+                      AND stims.stim1_y != -999
+                      AND stims.stim2_x != -999
+                      AND stims.stim2_y != -999;""".format(segment)
 
         data = [line for line in engine.execute(query)]
 
@@ -778,13 +781,13 @@ def make_plots(out_dir, connection_string):
         ax4 = fig.add_subplot(2, 2, 4)
 
         query = """SELECT stims.abs_time, .5*(stims.stim2_y + stims.stim1_y) as midpoint
-                          FROM stims
-                          JOIN headers ON stims.rootname = headers.rootname
-                          WHERE headers.segment = '{}' AND
-                              stims.stim1_x != -999 AND
-                              stims.stim1_y != -999 AND
-                              stims.stim2_x != -999 AND
-                              stims.stim2_y != -999;""".format(segment)
+                     FROM stims
+                     JOIN headers ON stims.rootname = headers.rootname
+                    WHERE headers.segment = '{}'
+                      AND stims.stim1_x != -999
+                      AND stims.stim1_y != -999
+                      AND stims.stim2_x != -999
+                      AND stims.stim2_y != -999;""".format(segment)
 
         ax4.plot(times, midpoint, 'o')
         ax4.set_xlabel('MJD')
@@ -803,13 +806,14 @@ def make_plots(out_dir, connection_string):
     ax.grid(True)
 
     data = engine.execute("""SELECT stim1_x, stim2_x
-                                    FROM stims
-                                    JOIN headers on stims.rootname = headers.rootname
-                                    WHERE headers.segment = 'FUVA' AND
-                                        stims.stim1_x != -999 AND
-                                        stims.stim1_y != -999 AND
-                                        stims.stim2_x != -999 AND
-                                        stims.stim2_y != -999;""")
+                               FROM stims
+                               JOIN headers on stims.rootname = headers.rootname
+                              WHERE headers.segment = 'FUVA'
+                                AND stims.stim1_x != -999
+                                AND stims.stim1_y != -999
+                                AND stims.stim2_x != -999
+                                AND stims.stim2_y != -999;""")
+
     data = [line for line in data]
 
     x1 = [float(line.stim1_x) for line in data]
@@ -828,13 +832,13 @@ def make_plots(out_dir, connection_string):
     ax.grid(True)
 
     data = engine.execute("""SELECT stim1_y, stim2_y
-                                    FROM stims
-                                    JOIN headers on stims.rootname = headers.rootname
-                                    WHERE headers.segment = 'FUVA' AND
-                                        stims.stim1_x != -999 AND
-                                        stims.stim1_y != -999 AND
-                                        stims.stim2_x != -999 AND
-                                        stims.stim2_y != -999;""")
+                               FROM stims
+                               JOIN headers ON stims.rootname = headers.rootname
+                              WHERE headers.segment = 'FUVA'
+                                AND stims.stim1_x != -999
+                                AND stims.stim1_y != -999
+                                AND stims.stim2_x != -999
+                                AND stims.stim2_y != -999;""")
 
     data = [line for line in data]
 
@@ -853,13 +857,13 @@ def make_plots(out_dir, connection_string):
     ax.grid(True)
 
     data = engine.execute("""SELECT stim1_x, stim2_x
-                                        FROM stims
-                                        JOIN headers on stims.rootname = headers.rootname
-                                        WHERE headers.segment = 'FUVB' AND
-                                            stims.stim1_x != -999 AND
-                                            stims.stim1_y != -999 AND
-                                            stims.stim2_x != -999 AND
-                                            stims.stim2_y != -999;""")
+                               FROM stims
+                               JOIN headers ON stims.rootname = headers.rootname
+                              WHERE headers.segment = 'FUVB'
+                                AND stims.stim1_x != -999
+                                AND stims.stim1_y != -999
+                                AND stims.stim2_x != -999
+                                AND stims.stim2_y != -999;""")
 
     data = [line for line in data]
 
@@ -877,13 +881,13 @@ def make_plots(out_dir, connection_string):
     ax.grid(True)
 
     data = engine.execute("""SELECT stim1_y, stim2_y
-                                        FROM stims
-                                        JOIN headers on stims.rootname = headers.rootname
-                                        WHERE headers.segment = 'FUVB' AND
-                                            stims.stim1_x != -999 AND
-                                            stims.stim1_y != -999 AND
-                                            stims.stim2_x != -999 AND
-                                            stims.stim2_y != -999;""")
+                               FROM stims
+                               JOIN headers ON stims.rootname = headers.rootname
+                              WHERE headers.segment = 'FUVB'
+                                AND stims.stim1_x != -999
+                                AND stims.stim1_y != -999
+                                AND stims.stim2_x != -999
+                                AND stims.stim2_y != -999;""")
 
     data = [line for line in data]
 

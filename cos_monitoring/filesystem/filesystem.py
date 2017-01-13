@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 def find_all_datasets(top_dir, processes=2):
     top_levels = []
-
     for item in os.listdir(top_dir):
         full_path = os.path.join(top_dir, item)
         pattern = re.compile('(\d{5}|CCI)')

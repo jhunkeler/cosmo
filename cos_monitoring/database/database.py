@@ -186,6 +186,7 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
         logger.warning("Exception hit for {}, adding blank entry".format(filename))
         logger.warning(e)
         session.add(table(file_id=foreign_key))
+        print(filename)
 
     session.commit()
     session.close()
@@ -236,7 +237,7 @@ def insert_files(**kwargs):
         logger.debug("NEW: Found {}".format(full_filepath))
 
         #-- properly formatted HST data should be the first 9 characters
-        #-- if this is not the case, insert NULL for this value
+        #-- if this is not the case, insert N/A for this value
         rootname = filename.split('_')[0]
 
         if not len(rootname) == 9:
@@ -618,7 +619,7 @@ def ingest_all():
     #populate_table(fuvb_corr_headers, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'])
 
     #-- Populate FUV x1d
-    #populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
+    populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
 
     #-------------------------------------------------------
     #-- Populate NUV data
@@ -639,7 +640,7 @@ def ingest_all():
     #populate_lampflash(settings['num_cpu'])
     #populate_darks(settings['num_cpu'])
     #populate_gain(settings['num_cpu'])
-    populate_stims(settings['num_cpu'])
+    #populate_stims(settings['num_cpu'])
     #populate_acqs(settings['num_cpu'])
 #-------------------------------------------------------------------------------
 
