@@ -37,7 +37,7 @@ def open_settings(config_file=None):
 
     """
 
-    config_file = config_file or os.path.join(os.environ['HOME'], "configure.yaml")
+    config_file = config_file or os.path.join(os.environ['HOME'], "configure_dev.yaml")
 
     with open(config_file, 'r') as f:
         settings = yaml.load(f)
@@ -81,7 +81,7 @@ class Files(Base):
     id = Column(Integer, primary_key=True)
 
     path = Column(String(70))
-    filename = Column(String(50))
+    filename = Column(String(60))
     rootname = Column(String(9))
 
     __table_args__ = (Index('idx_fullpath', 'path', 'filename', unique=True), )
@@ -152,8 +152,8 @@ class Stims(Base):
     stim2_y = Column(Float)
     counts = Column(Float)
     segment = Column(String(4))
-    file_id = Column(Integer, ForeignKey(Files.id))
 
+    file_id = Column(Integer, ForeignKey(Files.id))
     __table_args__ = (Index('idx_rootname', 'rootname', unique=False), )
     #file = relationship("Files", backref=backref('Stims', order_by=id))
 
@@ -232,6 +232,7 @@ class Flagged(Base):
     x = Column(Integer)
     y = Column(Integer)
 
+    file_id = Column(Integer, ForeignKey(Files.id))
     __table_args__ = (Index('coord', 'x', 'y', unique=False), )
 
 #-------------------------------------------------------------------------------
@@ -249,6 +250,7 @@ class GainTrends(Base):
     slope = Column(Float)
     intercept = Column(Float)
 
+    file_id = Column(Integer, ForeignKey(Files.id))
     __table_args__ = (Index('coord', 'x', 'y', unique=False), )
 
 #-------------------------------------------------------------------------------

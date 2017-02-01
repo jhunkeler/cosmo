@@ -11,7 +11,7 @@ from __future__ import print_function, absolute_import, division
 
 from astropy.io import fits
 import os
-from sqlalchemy import and_, or_, text, MetaData, and_
+from sqlalchemy import and_, or_, text, MetaData, and_, delete
 import sys
 import matplotlib as mpl
 mpl.use('Agg')
@@ -155,10 +155,11 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
                 q = session.query(table.rootname).filter(table.rootname==row['rootname'])
                 if not session.query(q.exists()).scalar():
                     session.add(table(**row))
+                    continue
                 else:
                     continue
 
-            #-- Because FUV and NUV have same x1d.fits file, we need to make sure
+            #-- Because FUV and NUV have same x1d.fits file format, we need to make sure
             #-- they get seperated into seperate tables.
 
             #-- FUV x1d
@@ -167,6 +168,7 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
                                                                    fuv_primary_headers.detector == 'FUV'))
                 if session.query(q.exists()).scalar():
                     session.add(table(**row))
+                    continue
                 else:
                     continue
 
@@ -176,6 +178,7 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
                                                                nuv_raw_headers.detector == 'NUV'))
                 if session.query(q.exists()).scalar():
                     session.add(table(**row))
+                    continue
                 else:
                     continue
 
@@ -183,10 +186,16 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
 
     except (IOError, ValueError, TypeError) as e:
         #-- Handle missing files
-        logger.warning("Exception hit for {}, adding blank entry".format(filename))
-        logger.warning(e)
-        session.add(table(file_id=foreign_key))
-        print(filename)
+
+        #-- Since we have a dynamic file system...
+        #-- This deals with deleting
+        if isinstance(e, IOError):
+            delete_file_from_all(filename)
+            logger.info("Deleting All Instances of {} in DB Structure".format(filename))
+        else:
+            logger.warning("Exception hit for {}, adding blank entry".format(filename))
+            logger.warning(e)
+            session.add(table(file_id=foreign_key))
 
     session.commit()
     session.close()
@@ -243,9 +252,11 @@ def insert_files(**kwargs):
         if not len(rootname) == 9:
             rootname = 'N/A'
 
+
         session.add(Files(path=path,
                           filename=filename,
-                          rootname=rootname))
+                          rootname=rootname
+                          ))
 
         #-- Commit every 20 files to not lose too much progress if
         #-- a failure happens.
@@ -273,7 +284,7 @@ def populate_darks(num_cpu=1):
                             outerjoin(Darks, Files.id == Darks.file_id).\
                             filter(Headers.targname == 'DARK').\
                             filter(Darks.file_id == None).\
-                            filter(Files.name.like('%\_corrtag%'))]
+                            filter(Files.filename.like('%\_corrtag%'))]
 
     session.close()
 
@@ -300,8 +311,8 @@ def populate_gain(num_cpu=1):
     files_to_add = [(result.id, os.path.join(result.path, result.name))
                         for result in session.query(Files).\
                             outerjoin(Gain, Files.id == Gain.file_id).\
-                            filter(or_(Files.name.like('l\_%\_00\____\_cci%'),
-                                       Files.name.like('l\_%\_01\____\_cci%'))).\
+                            filter(or_(Files.filename.like('l\_%\_00\____\_cci.fits%'),
+                                       Files.filename.like('l\_%\_01\____\_cci.fits%'))).\
                             filter(Gain.file_id == None)]
     session.close()
 
@@ -328,7 +339,7 @@ def populate_lampflash(num_cpu=1):
 
     files_to_add = [(result.id, os.path.join(result.path, result.name))
                         for result in session.query(Files).\
-                                filter(or_(Files.name.like('%lampflash%'), (Files.name.like('%_rawacq%')))).\
+                                filter(or_(Files.filename.like('%lampflash%'), (Files.filename.like('%_rawacq%')))).\
                                 outerjoin(Lampflash, Files.id == Lampflash.file_id).\
                                 filter(Lampflash.file_id == None)]
     session.close()
@@ -431,27 +442,28 @@ def delete_file_from_all(filename):
 
     settings = open_settings()
     Session, engine = load_connection(settings['connection_string'])
-
     session = Session()
+    connection = engine.connect()
 
-    print(filename)
-    files_to_remove = [(result.id, os.path.join(result.path, result.name))
+    files_to_remove = [(result.id, os.path.join(result.path, result.filename))
                             for result in session.query(Files).\
-                                    filter(Files.name.like("""%{}%""".format(filename)))]
+                                    filter(Files.filename.like("""%{}%""".format(filename)))]
+
+
     session.close()
 
-
-    print("Found: ")
-    print(files_to_remove)
     for (file_id, file_path) in files_to_remove:
         for table in reversed(Base.metadata.sorted_tables):
-            print("Removing {}, {} from {}".format(file_path, file_id, table.name))
-            if table.name == 'files':
-                q = """DELETE FROM {} WHERE id={}""".format(table.name, file_id)
+            if table.name == 'all_files':
+                #sql = """DELETE FROM :table WHERE id=:file_id"""
+                sql = """DELETE FROM {} WHERE id={}""".format(table, file_id)
             else:
-                q = """DELETE FROM {} WHERE file_id={}""".format(table.name, file_id)
+                #sql = """DELETE FROM :table WHERE file_id=:file_id"""
+                sql = """DELETE FROM {} WHERE file_id={}""".format(table, file_id)
 
-            engine.execute(text(q))
+            #params = {'table':table.name, 'file_id':file_id}
+            engine.execute(text(sql))
+            #engine.execute(text(sql))
 
 
 #-------------------------------------------------------------------------------
@@ -479,7 +491,7 @@ def show_file_from_all(filename):
     print(filename)
     files_to_show = [result.rootname
                             for result in session.query(Files).\
-                                    filter(Files.name.like("""%{}%""".format(filename)))]
+                                    filter(Files.filename.like("""%{}%""".format(filename)))]
     session.close()
 
 
@@ -584,11 +596,46 @@ def clean_slate(settings=None, engine=None, session=None):
     Base.metadata.drop_all(engine, checkfirst=False)
     Base.metadata.create_all(engine)
 
-    ingest_all()
-
-    run_all_monitors()
+    #ingest_all()
+    #run_all_monitors()
 #-------------------------------------------------------------------------------
+def clean_files():
 
+    """
+    clean_files is a temporary fix for the dynamic file system /smov/cos/Data/
+    When reprocessing or reference files are updated, new data is pulled from MAST
+    and the path contains the reprocessing date. When the date string in the path
+    is changed the newly processed data is ingested and the older data remains in the
+    database structure. This function queries all of the paths and filenames in the FILES
+    table and tries to open them. If they dont exist, any instance of this file will be
+    removed from ALL of the database tables which will make room for the newly processed data.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
+    settings = open_settings()
+    Session, engine = load_connection(settings['connection_string'])
+    session = Session()
+
+    sql = """SELECT path, filename FROM all_files"""
+
+    results = engine.execute(text(sql))
+
+    for row in results:
+        if os.path.isfile(os.path.join(row['path'], row['filename'])):
+            continue
+        else:
+            logger.info('CANNOT FIND {}, DELETING ALL INSTANCES OF THIS FILE'.format(os.path.join(row['path'], row['filename'])))
+            delete_file_from_all(row['filename'])
+
+    session.commit()
+    session.close()
+#-------------------------------------------------------------------------------
 def ingest_all():
     setup_logging()
 
@@ -596,11 +643,13 @@ def ingest_all():
     Session, engine = load_connection(settings['connection_string'])
     Base.metadata.create_all(engine)
 
+    logger.info("Clearing all data")
+    clean_files()
     logger.info("Ingesting all data")
 
 
     #-- Ingest all files into DB.
-    #insert_files(**settings)
+    insert_files(**settings)
 
     #-------------------------------------------------------
     #-- Populate FUV data
@@ -619,7 +668,7 @@ def ingest_all():
     #populate_table(fuvb_corr_headers, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'])
 
     #-- Populate FUV x1d
-    populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
+    #populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
 
     #-------------------------------------------------------
     #-- Populate NUV data

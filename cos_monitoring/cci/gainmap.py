@@ -465,7 +465,7 @@ def make_total_gain(gainmap_dir=None, segment='FUV', start_mjd=55055, end_mjd=70
         cci_hdu = fits.open(item)
         if not cci_hdu[0].header['EXPSTART'] >= start_mjd:
             continue
-        if not cci_hdu[0].header['EXPSTART'] <= end_mjd:
+        if not cci_hdu[0].header['EXPEND'] <= end_mjd:
             continue
 
         if not cci_hdu[0].header['DETHV'] >= min_hv:
@@ -473,7 +473,9 @@ def make_total_gain(gainmap_dir=None, segment='FUV', start_mjd=55055, end_mjd=70
         if not cci_hdu[0].header['DETHV'] <= max_hv:
             continue
 
-        test_list.append(item)
+        if cci_hdu[0].header['SRC_FILE'] == 'l_2017002040618_01_175_cci':
+            print('IT WORKED')
+
         cci_data = cci_hdu['MOD_GAIN'].data
 
         dethv = cci_hdu[0].header['DETHV']
@@ -502,7 +504,7 @@ def make_all_gainmaps_entry():
     parser.add_argument("-d",
                         '--dir',
                         type=str,
-                        default='/grp/hst/cos/Monitors/CCI/',
+                        default='/smov/cos/Data/CCI/',
                         help="directory containing the gainmaps")
 
     parser.add_argument("-s",
