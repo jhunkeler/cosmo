@@ -396,16 +396,6 @@ def populate_table(tablename, query_string, function, num_cpu=1):
     logger.info("Found {} files to add".format(len(args)))
     pool = mp.Pool(processes=num_cpu)
     pool.map(mp_insert, args)
-#-------------------------------------------------------------------------------
-
-
-
-
-# BEGIN KEYWORD LISTS FOR DB.
-
-
-
-
 
 #-------------------------------------------------------------------------------
 
@@ -599,7 +589,7 @@ def clean_slate(settings=None, engine=None, session=None):
     #ingest_all()
     #run_all_monitors()
 #-------------------------------------------------------------------------------
-def clean_files():
+def clean_files(num_cpu=1):
 
     """
     clean_files is a temporary fix for the dynamic file system /smov/cos/Data/
@@ -618,6 +608,7 @@ def clean_files():
     -------
     None
     """
+
     settings = open_settings()
     Session, engine = load_connection(settings['connection_string'])
     session = Session()
@@ -626,15 +617,19 @@ def clean_files():
 
     results = engine.execute(text(sql))
 
-    for row in results:
-        if os.path.isfile(os.path.join(row['path'], row['filename'])):
-            continue
-        else:
-            logger.info('CANNOT FIND {}, DELETING ALL INSTANCES OF THIS FILE'.format(os.path.join(row['path'], row['filename'])))
-            delete_file_from_all(row['filename'])
-
     session.commit()
     session.close()
+
+    #- Check and see if files actually exist
+    #-- If false, hold on to those files.
+    files_to_remove = [row['filename'] for row in results if not os.path.exists(os.path.join(row['path'], row['filename']))]
+
+    #-- Pool up and delete files and metadata from database.
+    pool = mp.Pool(processes=num_cpu)
+
+    if len(files_to_remove):
+        pool.map(delete_file_from_all, files_to_remove)
+
 #-------------------------------------------------------------------------------
 def ingest_all():
     setup_logging()
@@ -644,52 +639,52 @@ def ingest_all():
     Base.metadata.create_all(engine)
 
     logger.info("Clearing all data")
-    clean_files()
+    clean_files(settings['num_cpu'])
     logger.info("Ingesting all data")
 
 
     #-- Ingest all files into DB.
-    insert_files(**settings)
+    #insert_files(**settings)
 
     #-------------------------------------------------------
     #-- Populate FUV data
 
     #-- Populate FUV shared primary header info
-    #populate_table(fuv_primary_headers, '%_rawtag_a.fits%', fuv_primary_keys, settings['num_cpu'])
+    populate_table(fuv_primary_headers, '%_rawtag_a.fits%', fuv_primary_keys, settings['num_cpu'])
     #-- Does this in 2 steps, checks to make sure that if A shares B rootname then skip.
-    #populate_table(fuv_primary_headers, '%_rawtag_b.fits%', fuv_primary_keys, settings['num_cpu'])
+    populate_table(fuv_primary_headers, '%_rawtag_b.fits%', fuv_primary_keys, settings['num_cpu'])
 
     #-- Populate FUV Raw data
-    #populate_table(fuva_raw_headers, '%_rawtag_a.fits%', fuva_raw_keys, settings['num_cpu'])
-    #populate_table(fuvb_raw_headers, '%_rawtag_b.fits%', fuvb_raw_keys, settings['num_cpu'])
+    populate_table(fuva_raw_headers, '%_rawtag_a.fits%', fuva_raw_keys, settings['num_cpu'])
+    populate_table(fuvb_raw_headers, '%_rawtag_b.fits%', fuvb_raw_keys, settings['num_cpu'])
 
     #-- Populate FUV Corrtags
-    #populate_table(fuva_corr_headers, '%_corrtag_a.fits%', fuva_corr_keys, settings['num_cpu'])
-    #populate_table(fuvb_corr_headers, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'])
+    populate_table(fuva_corr_headers, '%_corrtag_a.fits%', fuva_corr_keys, settings['num_cpu'])
+    populate_table(fuvb_corr_headers, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'])
 
     #-- Populate FUV x1d
-    #populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
+    populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
 
     #-------------------------------------------------------
     #-- Populate NUV data
 
     #-- Populate NUV Raw data
-    #populate_table(nuv_raw_headers, '%_rawtag.fits%', nuv_raw_keys, settings['num_cpu'])
+    populate_table(nuv_raw_headers, '%_rawtag.fits%', nuv_raw_keys, settings['num_cpu'])
 
     #-- Populate NUV Corrtags
-    #populate_table(nuv_corr_headers, '%_corrtag.fits%', nuv_corr_keys, settings['num_cpu'])
+    populate_table(nuv_corr_headers, '%_corrtag.fits%', nuv_corr_keys, settings['num_cpu'])
 
     #-- Populate NUV x1d
-    #populate_table(nuv_x1d_headers, 'l%\_x1d%', nuv_x1d_keys, settings['num_cpu'])
+    populate_table(nuv_x1d_headers, 'l%\_x1d%', nuv_x1d_keys, settings['num_cpu'])
 
     #-------------------------------------------------------
     #-- Populate monitor tables
 
     #populate_spt(settings['num_cpu'])
-    #populate_lampflash(settings['num_cpu'])
-    #populate_darks(settings['num_cpu'])
-    #populate_gain(settings['num_cpu'])
-    #populate_stims(settings['num_cpu'])
+    populate_lampflash(settings['num_cpu'])
+    populate_darks(settings['num_cpu'])
+    populate_gain(settings['num_cpu'])
+    populate_stims(settings['num_cpu'])
     #populate_acqs(settings['num_cpu'])
 #-------------------------------------------------------------------------------
 
@@ -805,6 +800,7 @@ def fuv_x1d_keys(filename):
                         }
     return keywords
 #-------------------------------------------------------------------------------
+
 
 #-- NEW NUV KEYWORD DICTIONARIES
 
