@@ -212,6 +212,7 @@ def insert_with_yield(filename, table, function, foreign_key=None, **kwargs):
 
 
 #-------------------------------------------------------------------------------
+
 def insert_files(**kwargs):
     """Populate the main table of all files in the base directory
 
@@ -267,6 +268,7 @@ def insert_files(**kwargs):
     session.close()
 
 #-------------------------------------------------------------------------------
+
 def populate_darks(num_cpu=1):
     """ Populate the darks table
 
@@ -278,11 +280,11 @@ def populate_darks(num_cpu=1):
     Session, engine = load_connection(settings['connection_string'])
     session = Session()
 
-    files_to_add = [(result.id, os.path.join(result.path, result.name))
+    files_to_add = [(result.id, os.path.join(result.path, result.filename))
                         for result in session.query(Files).\
-                            outerjoin(Headers, Files.rootname == Headers.rootname).\
+                            outerjoin(fuv_primary_headers, Files.rootname == fuv_primary_headers.rootname).\
                             outerjoin(Darks, Files.id == Darks.file_id).\
-                            filter(Headers.targname == 'DARK').\
+                            filter(fuv_primary_headers.targname == 'DARK').\
                             filter(Darks.file_id == None).\
                             filter(Files.filename.like('%\_corrtag%'))]
 
@@ -295,6 +297,7 @@ def populate_darks(num_cpu=1):
     pool.map(mp_insert, args)
 
 #-------------------------------------------------------------------------------
+
 def populate_gain(num_cpu=1):
     """ Populate the cci gain table
 
@@ -308,7 +311,7 @@ def populate_gain(num_cpu=1):
 
     session = Session()
 
-    files_to_add = [(result.id, os.path.join(result.path, result.name))
+    files_to_add = [(result.id, os.path.join(result.path, result.filename))
                         for result in session.query(Files).\
                             outerjoin(Gain, Files.id == Gain.file_id).\
                             filter(or_(Files.filename.like('l\_%\_00\____\_cci.fits%'),
@@ -327,6 +330,7 @@ def populate_gain(num_cpu=1):
     pool = mp.Pool(processes=num_cpu)
     pool.map(call, functions)
 #-------------------------------------------------------------------------------
+
 def populate_lampflash(num_cpu=1):
     """ Populate the lampflash table
 
@@ -337,7 +341,7 @@ def populate_lampflash(num_cpu=1):
     Session, engine = load_connection(settings['connection_string'])
     session = Session()
 
-    files_to_add = [(result.id, os.path.join(result.path, result.name))
+    files_to_add = [(result.id, os.path.join(result.path, result.filename))
                         for result in session.query(Files).\
                                 filter(or_(Files.filename.like('%lampflash%'), (Files.filename.like('%_rawacq%')))).\
                                 outerjoin(Lampflash, Files.id == Lampflash.file_id).\
@@ -352,6 +356,7 @@ def populate_lampflash(num_cpu=1):
     pool.map(mp_insert, args)
 
 #-------------------------------------------------------------------------------
+
 def populate_stims(num_cpu=1):
     """ Populate the stim table
 
@@ -377,6 +382,7 @@ def populate_stims(num_cpu=1):
     pool.map(mp_insert, args)
 
 #-------------------------------------------------------------------------------
+
 def populate_table(tablename, query_string, function, num_cpu=1):
     logger.info("adding to {} table".format(tablename.__tablename__))
 
@@ -417,44 +423,6 @@ def cm_delete():
     args = parser.parse_args()
 
     delete_file_from_all(args.filename)
-
-#-------------------------------------------------------------------------------
-
-def delete_file_from_all(filename):
-    """Delete a filename from all databases and directory structure
-
-    Parameters
-    ----------
-    filename : str
-        name of the file, will be pattern-matched with %filename%
-
-    """
-
-    settings = open_settings()
-    Session, engine = load_connection(settings['connection_string'])
-    session = Session()
-    connection = engine.connect()
-
-    files_to_remove = [(result.id, os.path.join(result.path, result.filename))
-                            for result in session.query(Files).\
-                                    filter(Files.filename.like("""%{}%""".format(filename)))]
-
-
-    session.close()
-
-    for (file_id, file_path) in files_to_remove:
-        for table in reversed(Base.metadata.sorted_tables):
-            if table.name == 'all_files':
-                #sql = """DELETE FROM :table WHERE id=:file_id"""
-                sql = """DELETE FROM {} WHERE id={}""".format(table, file_id)
-            else:
-                #sql = """DELETE FROM :table WHERE file_id=:file_id"""
-                sql = """DELETE FROM {} WHERE file_id={}""".format(table, file_id)
-
-            #params = {'table':table.name, 'file_id':file_id}
-            engine.execute(text(sql))
-            #engine.execute(text(sql))
-
 
 #-------------------------------------------------------------------------------
 
@@ -532,24 +500,6 @@ def clear_all_databases(settings, nuke=False):
     else:
         sys.exit('TO DELETE DB YOU NEED TO SET NUKE FLAG, EXITING')
 
-#-------------------------------------------------------------------------------
-
-def run_all_monitors():
-    setup_logging()
-
-    #-- make sure all tables are present
-    settings = open_settings()
-    Session, engine = load_connection(settings['connection_string'])
-    Base.metadata.create_all(engine)
-
-    logger.info("Starting to run all monitors.")
-
-    dark_monitor(settings['monitor_location'])
-    cci_monitor()
-    stim_monitor()
-    osm_monitor()
-
-    logger.info("Finished running all monitors.")
 
 #-------------------------------------------------------------------------------
 
@@ -588,6 +538,44 @@ def clean_slate(settings=None, engine=None, session=None):
 
     #ingest_all()
     #run_all_monitors()
+
+#-------------------------------------------------------------------------------
+
+def delete_file_from_all(filename):
+    """Delete a filename from all databases and directory structure
+
+    Parameters
+    ----------
+    filename : str
+        name of the file, will be pattern-matched with %filename%
+
+    """
+
+    settings = open_settings()
+    Session, engine = load_connection(settings['connection_string'])
+    session = Session()
+    connection = engine.connect()
+
+    files_to_remove = [(result.id, os.path.join(result.path, result.filename))
+                            for result in session.query(Files).\
+                                    filter(Files.filename.like("""%{}%""".format(filename)))]
+
+
+    session.close()
+
+    for (file_id, file_path) in files_to_remove:
+        for table in reversed(Base.metadata.sorted_tables):
+            if table.name == 'all_files':
+                #sql = """DELETE FROM :table WHERE id=:file_id"""
+                sql = """DELETE FROM {} WHERE id={}""".format(table, file_id)
+            else:
+                #sql = """DELETE FROM :table WHERE file_id=:file_id"""
+                sql = """DELETE FROM {} WHERE file_id={}""".format(table, file_id)
+
+            #params = {'table':table.name, 'file_id':file_id}
+            engine.execute(text(sql))
+            #engine.execute(text(sql))
+
 #-------------------------------------------------------------------------------
 def clean_files(num_cpu=1):
 
@@ -613,9 +601,7 @@ def clean_files(num_cpu=1):
     Session, engine = load_connection(settings['connection_string'])
     session = Session()
 
-    sql = """SELECT path, filename FROM all_files"""
-
-    results = engine.execute(text(sql))
+    results = engine.execute(text("""SELECT path, filename FROM all_files"""))
 
     session.commit()
     session.close()
@@ -639,7 +625,7 @@ def ingest_all():
     Base.metadata.create_all(engine)
 
     logger.info("Clearing all data")
-    clean_files(settings['num_cpu'])
+    #clean_files(settings['num_cpu'])
     logger.info("Ingesting all data")
 
 
@@ -650,42 +636,62 @@ def ingest_all():
     #-- Populate FUV data
 
     #-- Populate FUV shared primary header info
-    populate_table(fuv_primary_headers, '%_rawtag_a.fits%', fuv_primary_keys, settings['num_cpu'])
+    #populate_table(fuv_primary_headers, '%_rawtag_a.fits%', fuv_primary_keys, settings['num_cpu'])
     #-- Does this in 2 steps, checks to make sure that if A shares B rootname then skip.
-    populate_table(fuv_primary_headers, '%_rawtag_b.fits%', fuv_primary_keys, settings['num_cpu'])
+    #populate_table(fuv_primary_headers, '%_rawtag_b.fits%', fuv_primary_keys, settings['num_cpu'])
 
     #-- Populate FUV Raw data
-    populate_table(fuva_raw_headers, '%_rawtag_a.fits%', fuva_raw_keys, settings['num_cpu'])
-    populate_table(fuvb_raw_headers, '%_rawtag_b.fits%', fuvb_raw_keys, settings['num_cpu'])
+    #populate_table(fuva_raw_headers, '%_rawtag_a.fits%', fuva_raw_keys, settings['num_cpu'])
+    #populate_table(fuvb_raw_headers, '%_rawtag_b.fits%', fuvb_raw_keys, settings['num_cpu'])
 
     #-- Populate FUV Corrtags
-    populate_table(fuva_corr_headers, '%_corrtag_a.fits%', fuva_corr_keys, settings['num_cpu'])
-    populate_table(fuvb_corr_headers, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'])
+    #populate_table(fuva_corr_headers, '%_corrtag_a.fits%', fuva_corr_keys, settings['num_cpu'])
+    #populate_table(fuvb_corr_headers, '%_corrtag_b.fits%', fuvb_corr_keys, settings['num_cpu'])
 
     #-- Populate FUV x1d
-    populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
+    #populate_table(fuv_x1d_headers, 'l%\_x1d%', fuv_x1d_keys, settings['num_cpu'])
 
     #-------------------------------------------------------
     #-- Populate NUV data
 
     #-- Populate NUV Raw data
-    populate_table(nuv_raw_headers, '%_rawtag.fits%', nuv_raw_keys, settings['num_cpu'])
+    #populate_table(nuv_raw_headers, '%_rawtag.fits%', nuv_raw_keys, settings['num_cpu'])
 
     #-- Populate NUV Corrtags
-    populate_table(nuv_corr_headers, '%_corrtag.fits%', nuv_corr_keys, settings['num_cpu'])
+    #populate_table(nuv_corr_headers, '%_corrtag.fits%', nuv_corr_keys, settings['num_cpu'])
 
     #-- Populate NUV x1d
-    populate_table(nuv_x1d_headers, 'l%\_x1d%', nuv_x1d_keys, settings['num_cpu'])
+    #populate_table(nuv_x1d_headers, 'l%\_x1d%', nuv_x1d_keys, settings['num_cpu'])
 
     #-------------------------------------------------------
     #-- Populate monitor tables
 
     #populate_spt(settings['num_cpu'])
-    populate_lampflash(settings['num_cpu'])
-    populate_darks(settings['num_cpu'])
-    populate_gain(settings['num_cpu'])
-    populate_stims(settings['num_cpu'])
+    #populate_lampflash(settings['num_cpu'])
+    #populate_darks(settings['num_cpu'])
+    #populate_gain(settings['num_cpu'])
+    #populate_stims(settings['num_cpu'])
     #populate_acqs(settings['num_cpu'])
+
+#-------------------------------------------------------------------------------
+
+def run_all_monitors():
+    setup_logging()
+
+    #-- make sure all tables are present
+    settings = open_settings()
+    Session, engine = load_connection(settings['connection_string'])
+    Base.metadata.create_all(engine)
+
+    logger.info("Starting to run all monitors.")
+
+    #dark_monitor(settings['monitor_location'])
+    #cci_monitor()
+    stim_monitor()
+    osm_monitor()
+
+    logger.info("Finished running all monitors.")
+
 #-------------------------------------------------------------------------------
 
 

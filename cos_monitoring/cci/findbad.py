@@ -308,33 +308,43 @@ def write_projection(out_dir, slope_image, intercept_image, bad_image, segment, 
     -------
         FITS file with the saved array data.
     """
+    try:
+        hdu_out = fits.HDUList(fits.PrimaryHDU())
+        #hdu_out[0].header.update('TELESCOP', 'HST')
+        #hdu_out[0].header.update('INSTRUME', 'COS')
+        #hdu_out[0].header.update('DETECTOR', 'FUV')
+        #hdu_out[0].header.update('OPT_ELEM', 'ANY')
+        #hdu_out[0].header.update('Fsave_dirILETYPE', 'PROJ_BAD')
+        #hdu_out[0].header.update('DETHV', dethv)
 
-    hdu_out = fits.HDUList(fits.PrimaryHDU())
-    hdu_out[0].header.update('TELESCOP', 'HST')
-    hdu_out[0].header.update('INSTRUME', 'COS')
-    hdu_out[0].header.update('DETECTOR', 'FUV')
-    hdu_out[0].header.update('OPT_ELEM', 'ANY')
-    hdu_out[0].header.update('Fsave_dirILETYPE', 'PROJ_BAD')
-    hdu_out[0].header.update('DETHV', dethv)
+        #hdu_out[0].header.update('SEGMENT', segment)
 
-    hdu_out[0].header.update('SEGMENT', segment)
+        hdu_out[0].header['TELESCOP'] = 'HST'
+        hdu_out[0].header['INSTRUME'] = 'COS'
+        hdu_out[0].header['DETECTOR'] = 'FUV'
+        hdu_out[0].header['OPT_ELEM'] = 'ANY'
+        hdu_out[0].header['Fsave_dirILETYPE'] = 'PROJ_BAD'
+        hdu_out[0].header['DETHV'] = dethv
+        hdu_out[0].header['SEGMENT'] = segment
 
-    #---Ext 1
-    hdu_out.append(fits.ImageHDU(data=bad_image))
-    hdu_out[1].header.update('EXTNAME', 'PROJBAD')
+        #---Ext 1
+        hdu_out.append(fits.ImageHDU(data=bad_image))
+        hdu_out[1].header.update('EXTNAME', 'PROJBAD')
 
-    #---Ext 2
-    hdu_out.append(fits.ImageHDU(data=slope_image))
-    hdu_out[2].header.update('EXTNAME', 'SLOPE')
+        #---Ext 2
+        hdu_out.append(fits.ImageHDU(data=slope_image))
+        hdu_out[2].header.update('EXTNAME', 'SLOPE')
 
-    #---Ext 3
-    hdu_out.append(fits.ImageHDU(data=intercept_image))
-    hdu_out[3].header.update('EXTNAME', 'INTERCEPT')
+        #---Ext 3
+        hdu_out.append(fits.ImageHDU(data=intercept_image))
+        hdu_out[3].header.update('EXTNAME', 'INTERCEPT')
 
-    #---Writeout
-    hdu_out.writeto(os.path.join(out_dir, 'proj_bad_{}_{}.fits'.format(segment, dethv)) ,clobber=True)
-    hdu_out.close()
+        #---Writeout
+        hdu_out.writeto(os.path.join(out_dir, 'proj_bad_{}_{}.fits'.format(segment, dethv)) ,clobber=True)
+        hdu_out.close()
 
+    except ValueError:
+        print('This thing is jacked up {}'.format(os.path.join(out_dir, 'proj_bad_{}_{}.fits'.format(segment, dethv))))
 #-------------------------------------------------------------------------------
 
 def time_fitting(x_fit, y_fit):

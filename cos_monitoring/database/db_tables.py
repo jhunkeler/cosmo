@@ -80,9 +80,9 @@ class Files(Base):
 
     id = Column(Integer, primary_key=True)
 
+    rootname = Column(String(9))
     path = Column(String(70))
     filename = Column(String(60))
-    rootname = Column(String(9))
 
     __table_args__ = (Index('idx_fullpath', 'path', 'filename', unique=True), )
     __table_args__ = (Index('idx_rootname', 'rootname'), )
@@ -267,7 +267,6 @@ class fuv_primary_headers(Base):
     id = Column(Integer, primary_key=True)
 
     filename = Column(String(50))
-    rootname = Column(String(9))
     date_obs = Column(String(10))
     detector = Column(String(5))
     imagetyp = Column(String(10))
